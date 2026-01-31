@@ -3,7 +3,22 @@ import { db } from '../config/database';
 
 const router = Router();
 
-// Health check
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     description: Returns the health status of the API and its services
+ *     tags:
+ *       - Health
+ *     responses:
+ *       200:
+ *         description: Health status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthResponse'
+ */
 router.get('/health', async (req, res) => {
   const dbHealthy = await db.healthCheck();
   res.json({
