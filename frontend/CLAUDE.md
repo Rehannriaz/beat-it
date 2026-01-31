@@ -14,27 +14,30 @@ This document describes the frontend conventions and patterns for AI agents and 
 
 ```
 frontend/
-├── app/                  # Next.js App Router pages
-│   ├── layout.tsx        # Root layout with Providers
-│   ├── page.tsx          # Home page
-│   └── globals.css       # Global styles
-├── hooks/                # React Query hooks
-│   ├── index.ts          # Hook exports
-│   └── useHealth.ts      # Example hook
-├── lib/                  # Utilities and configuration
-│   ├── api.ts            # API client
-│   ├── providers.tsx     # React Query provider
-│   └── query-client.ts   # Query client config
-├── types/                # TypeScript types
-│   └── api.ts            # API response types
+├── src/                  # Source code (import via @/)
+│   ├── app/              # Next.js App Router pages
+│   │   ├── layout.tsx    # Root layout with Providers
+│   │   ├── page.tsx      # Home page
+│   │   └── globals.css   # Global styles
+│   ├── hooks/            # React Query hooks
+│   │   ├── index.ts      # Hook exports
+│   │   └── useHealth.ts  # Example hook
+│   ├── lib/              # Utilities and configuration
+│   │   ├── api.ts        # API client
+│   │   ├── providers.tsx # React Query provider
+│   │   └── query-client.ts
+│   └── types/            # TypeScript types
+│       └── api.ts        # API response types
 └── public/               # Static assets
 ```
+
+**Import alias**: Use `@/` to import from `src/` (e.g., `import { api } from '@/lib/api'`)
 
 ## Data Fetching Conventions
 
 ### Creating a New Hook
 
-1. **Create the hook file** in `hooks/` with the naming pattern `use[Resource].ts`
+1. **Create the hook file** in `src/hooks/` with the naming pattern `use[Resource].ts`
 2. **Define query keys** using a factory pattern for cache management
 3. **Export from index.ts**
 
@@ -141,7 +144,7 @@ export function MyComponent() {
 
 ## API Client
 
-The `lib/api.ts` provides a typed fetch wrapper:
+The `src/lib/api.ts` provides a typed fetch wrapper:
 
 ```typescript
 import { api } from '@/lib/api';
@@ -164,7 +167,7 @@ await api.delete('/endpoint/123');
 
 ## Type Definitions
 
-Add API response types in `types/api.ts`:
+Add API response types in `src/types/api.ts`:
 
 ```typescript
 export type User = {
@@ -201,5 +204,5 @@ NEXT_PUBLIC_API_URL=http://localhost:3001/api
 3. **Use the query key factory pattern** - see examples above
 4. **Mutations should invalidate related queries** - keep cache consistent
 5. **Add 'use client' directive** for components using hooks
-6. **Define types in types/api.ts** - keep types centralized
-7. **Export hooks from hooks/index.ts** - enables clean imports
+6. **Define types in src/types/api.ts** - keep types centralized
+7. **Export hooks from src/hooks/index.ts** - enables clean imports
