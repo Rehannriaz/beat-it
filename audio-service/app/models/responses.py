@@ -51,3 +51,29 @@ class GeneratePatternResponse(BaseModel):
     success: bool
     pattern: Optional[GamePattern] = None
     error: Optional[str] = None
+
+
+class AudioFeaturesInput(BaseModel):
+    """Audio features input for pattern generation."""
+    bpm: float
+    duration: float
+    beat_times: list[float]
+    downbeat_times: list[float]
+    onset_times: list[float]
+    onset_strengths: list[float]
+    energy_curve: list[float]
+    energy_segments: list[dict]
+    bass_energy: list[float]
+    mid_energy: list[float]
+    high_energy: list[float]
+    segments: list[dict]
+    intensity_curve: list[float]
+
+
+class GenerateFromFeaturesRequest(BaseModel):
+    """Request to generate pattern from pre-analyzed features."""
+    features: AudioFeaturesInput
+    song_id: str
+    title: str
+    artist: str
+    difficulty: str

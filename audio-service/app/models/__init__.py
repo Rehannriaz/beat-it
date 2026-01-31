@@ -7,6 +7,8 @@ from .responses import (
     TileData,
     PatternMetadata,
     PatternSettings,
+    AudioFeaturesInput,
+    GenerateFromFeaturesRequest,
 )
 
 __all__ = [
@@ -19,4 +21,6 @@ __all__ = [
     "TileData",
     "PatternMetadata",
     "PatternSettings",
+    "AudioFeaturesInput",
+    "GenerateFromFeaturesRequest",
 ]
