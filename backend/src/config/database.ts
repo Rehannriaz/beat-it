@@ -2,7 +2,7 @@ import { Pool, PoolClient } from 'pg';
 import dns from 'dns';
 import dotenv from 'dotenv';
 
-// Force IPv4 globally - fixes Docker IPv6 connectivity issues with Supabase
+// Force Node.js to prefer IPv4 - must be set before any connections
 dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config();
@@ -12,7 +12,8 @@ const isSupabase = host.includes('supabase.co');
 
 console.log(`Connecting to database at ${host}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME}`);
 
-const pool = new Pool({
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const poolConfig: any = {
   host,
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'hackathon_db',
@@ -22,7 +23,18 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
   ssl: isSupabase ? { rejectUnauthorized: false } : false,
-});
+};
+
+// Force IPv4 lookup at pg driver level for Supabase connections
+if (isSupabase) {
+  poolConfig.lookup = (hostname: string, callback: (err: Error | null, address: string, family: number) => void) => {
+    dns.lookup(hostname, { family: 4 }, (err, address, family) => {
+      callback(err, address, family);
+    });
+  };
+}
+
+const pool = new Pool(poolConfig);
 
 pool.on('connect', () => console.log('Database connected successfully'));
 pool.on('error', (err) => console.error('Database connection error:', err.message));
