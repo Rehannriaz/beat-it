@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { db } from '../config/database';
 import { songRoutes } from './songRoutes';
+import { spotifyAuthRoutes } from './spotifyAuth';
 
 const router = Router();
 
@@ -35,6 +36,7 @@ router.get('/health', async (req, res) => {
 
 // Mount route modules
 router.use('/songs', songRoutes);
+router.use('/', spotifyAuthRoutes); // Spotify auth routes (callback and token exchange)
 
 /**
  * @swagger
