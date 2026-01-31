@@ -41,6 +41,20 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
   return response.json();
 }
 
+async function uploadFile<T>(endpoint: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Upload failed' }));
+    throw new ApiError(response.status, error.message || 'Upload failed');
+  }
+
+  return response.json();
+}
+
 export const api = {
   get: <T>(endpoint: string, headers?: Record<string, string>) =>
     request<T>(endpoint, { method: 'GET', headers }),
@@ -56,6 +70,9 @@ export const api = {
 
   delete: <T>(endpoint: string, headers?: Record<string, string>) =>
     request<T>(endpoint, { method: 'DELETE', headers }),
+
+  upload: <T>(endpoint: string, formData: FormData) =>
+    uploadFile<T>(endpoint, formData),
 };
 
 export { ApiError };

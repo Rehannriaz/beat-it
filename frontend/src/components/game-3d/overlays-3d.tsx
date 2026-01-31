@@ -4,18 +4,31 @@ import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import type { Theme } from '@/lib/game-types'
 import type { GameState3D } from '@/hooks/use-game-3d'
+import type { GamePattern } from '@/lib/pattern-types'
 import { themeStyles, LANE_KEYS } from '@/lib/game-types'
-import { Play, Pause, RotateCcw, Home } from 'lucide-react'
+import { Play, Pause, RotateCcw, Home, Music, Infinity, Loader2 } from 'lucide-react'
 
 interface StartScreen3DProps {
   theme: Theme
   onStart: () => void
   onThemeChange: (theme: Theme) => void
+  pattern?: GamePattern | null
+  patternLoading?: boolean
+  usePattern?: boolean
+  onToggleMode?: () => void
 }
 
 const themes: Theme[] = ['vaporwave', 'retro', 'cyberpunk', 'minimal']
 
-export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DProps) {
+export function StartScreen3D({
+  theme,
+  onStart,
+  onThemeChange,
+  pattern,
+  patternLoading,
+  usePattern = true,
+  onToggleMode
+}: StartScreen3DProps) {
   const styles = themeStyles[theme]
 
   return (
@@ -24,8 +37,8 @@ export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DPr
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="absolute inset-0 flex flex-col items-center justify-center z-20"
-      style={{ 
-        background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.8) 100%)' 
+      style={{
+        background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,0.8) 100%)'
       }}
     >
       <motion.h1
@@ -33,14 +46,14 @@ export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DPr
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
         className={`text-5xl md:text-7xl font-bold mb-2 ${styles.font}`}
-        style={{ 
+        style={{
           color: styles.textColor,
           textShadow: `0 0 40px ${styles.glowColor}, 0 0 80px ${styles.glowColor}`
         }}
       >
         RHYTHM RUSH
       </motion.h1>
-      
+
       <motion.p
         initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -50,6 +63,68 @@ export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DPr
       >
         3D Edition
       </motion.p>
+
+      {/* Mode selector */}
+      {onToggleMode && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.35 }}
+          className="flex gap-3 mb-6"
+        >
+          <button
+            onClick={onToggleMode}
+            className={`px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center gap-2 ${
+              usePattern ? 'scale-105' : 'opacity-50 hover:opacity-80'
+            }`}
+            style={{
+              borderColor: usePattern ? styles.glowColor : 'transparent',
+              background: usePattern ? `${styles.glowColor}20` : 'rgba(255,255,255,0.05)',
+              color: styles.textColor,
+            }}
+          >
+            {patternLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Music className="w-4 h-4" />
+            )}
+            <span className="text-sm font-medium">Pattern</span>
+          </button>
+          <button
+            onClick={onToggleMode}
+            className={`px-4 py-2 rounded-lg border-2 transition-all duration-300 flex items-center gap-2 ${
+              !usePattern ? 'scale-105' : 'opacity-50 hover:opacity-80'
+            }`}
+            style={{
+              borderColor: !usePattern ? styles.glowColor : 'transparent',
+              background: !usePattern ? `${styles.glowColor}20` : 'rgba(255,255,255,0.05)',
+              color: styles.textColor,
+            }}
+          >
+            <Infinity className="w-4 h-4" />
+            <span className="text-sm font-medium">Endless</span>
+          </button>
+        </motion.div>
+      )}
+
+      {/* Pattern info */}
+      {usePattern && pattern && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.38 }}
+          className="text-center mb-6 px-6 py-3 rounded-lg"
+          style={{
+            background: 'rgba(255,255,255,0.05)',
+            color: styles.textColor
+          }}
+        >
+          <p className="text-lg font-semibold">{pattern.metadata.songTitle}</p>
+          <p className="text-sm opacity-60">
+            {pattern.metadata.artist} • {pattern.metadata.bpm} BPM • {pattern.tiles.length} tiles
+          </p>
+        </motion.div>
+      )}
 
       {/* Theme selector */}
       <motion.div
@@ -67,8 +142,8 @@ export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DPr
             }`}
             style={{
               borderColor: t === theme ? themeStyles[t].glowColor : 'transparent',
-              background: t === theme 
-                ? `${themeStyles[t].glowColor}20` 
+              background: t === theme
+                ? `${themeStyles[t].glowColor}20`
                 : 'rgba(255,255,255,0.05)',
               color: themeStyles[t].textColor,
               boxShadow: t === theme ? `0 0 20px ${themeStyles[t].glowColor}40` : 'none'
@@ -96,7 +171,7 @@ export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DPr
               boxShadow: `0 0 15px ${styles.laneColors[i]}40`
             }}
           >
-            <span 
+            <span
               className="text-xl font-bold"
               style={{ color: styles.laneColors[i] }}
             >
@@ -115,14 +190,24 @@ export function StartScreen3D({ theme, onStart, onThemeChange }: StartScreen3DPr
           onClick={onStart}
           size="lg"
           className="text-lg px-10 py-6 rounded-xl"
+          disabled={usePattern && patternLoading}
           style={{
             background: styles.glowColor,
             color: '#000',
             boxShadow: `0 0 30px ${styles.glowColor}60`
           }}
         >
-          <Play className="w-6 h-6 mr-2" />
-          START GAME
+          {patternLoading && usePattern ? (
+            <>
+              <Loader2 className="w-6 h-6 mr-2 animate-spin" />
+              LOADING...
+            </>
+          ) : (
+            <>
+              <Play className="w-6 h-6 mr-2" />
+              START GAME
+            </>
+          )}
         </Button>
       </motion.div>
     </motion.div>

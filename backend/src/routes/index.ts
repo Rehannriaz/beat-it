@@ -1,5 +1,8 @@
 import { Router } from 'express';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { db } from '../config/database';
+import { songRoutes } from './songRoutes';
 
 const router = Router();
 
@@ -31,8 +34,28 @@ router.get('/health', async (req, res) => {
 });
 
 // Mount route modules
-// Example:
-// router.use('/users', userRoutes);
-// router.use('/auth', authRoutes);
+router.use('/songs', songRoutes);
+
+/**
+ * @swagger
+ * /patterns/example:
+ *   get:
+ *     summary: Get example pattern
+ *     description: Returns a sample game pattern for testing
+ *     tags:
+ *       - Patterns
+ *     responses:
+ *       200:
+ *         description: Example pattern data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/GamePattern'
+ */
+router.get('/patterns/example', (req, res) => {
+  const patternPath = join(__dirname, '../data/example-pattern.json');
+  const pattern = JSON.parse(readFileSync(patternPath, 'utf-8'));
+  res.json(pattern);
+});
 
 export const routes = router;

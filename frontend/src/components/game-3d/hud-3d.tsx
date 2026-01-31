@@ -142,7 +142,7 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
           className="text-xs uppercase tracking-widest opacity-40"
           style={{ color: styles.textColor }}
         >
-          Speed: {gameState.speed.toFixed(1)}
+          Time: {gameState.gameTime.toFixed(1)}s
         </p>
       </motion.div>
 

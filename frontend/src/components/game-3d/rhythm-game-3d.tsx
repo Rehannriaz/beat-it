@@ -3,7 +3,7 @@
 import { useState, Suspense } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
-import { useGame3D } from '@/hooks/use-game-3d'
+import { useGame3D, useExamplePattern } from '@/hooks'
 import { HUD3D } from './hud-3d'
 import { StartScreen3D, PauseScreen3D, GameOverScreen3D } from './overlays-3d'
 import type { Theme } from '@/lib/game-types'
@@ -36,7 +36,13 @@ function LoadingScreen({ theme }: { theme: Theme }) {
 
 export function RhythmGame3D() {
   const [theme, setTheme] = useState<Theme>('vaporwave')
-  const { gameState, startGame, pauseGame, endGame } = useGame3D()
+  const [usePattern, setUsePattern] = useState(true)
+
+  const { data: pattern, isLoading: patternLoading } = useExamplePattern()
+  const { gameState, startGame, pauseGame, endGame, mode } = useGame3D({
+    pattern: usePattern ? pattern : null,
+    mode: usePattern ? 'pattern' : 'endless'
+  })
 
   return (
     <div className="w-full h-screen relative overflow-hidden">
@@ -58,6 +64,10 @@ export function RhythmGame3D() {
             theme={theme}
             onStart={startGame}
             onThemeChange={setTheme}
+            pattern={pattern}
+            patternLoading={patternLoading}
+            usePattern={usePattern}
+            onToggleMode={() => setUsePattern(prev => !prev)}
           />
         )}
 

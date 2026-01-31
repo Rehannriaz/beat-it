@@ -5,11 +5,21 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Example: Create a users table (modify as needed)
--- CREATE TABLE IF NOT EXISTS users (
---     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
---     email VARCHAR(255) UNIQUE NOT NULL,
---     password_hash VARCHAR(255) NOT NULL,
---     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
---     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
--- );
+-- Songs table: stores uploaded songs and their pattern data
+CREATE TABLE IF NOT EXISTS songs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title VARCHAR(255) NOT NULL,
+    artist VARCHAR(255),
+    duration DECIMAL(10, 2),
+    bpm INTEGER,
+    difficulty VARCHAR(50) DEFAULT 'medium',
+    file_url TEXT NOT NULL,
+    file_path TEXT NOT NULL,
+    pattern JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for faster pattern queries
+CREATE INDEX IF NOT EXISTS idx_songs_difficulty ON songs(difficulty);
+CREATE INDEX IF NOT EXISTS idx_songs_created_at ON songs(created_at DESC);
