@@ -1,0 +1,47 @@
+{
+  "id": "e7258a38-200b-4017-841c-f7c6e1a75abd",
+  "title": "Rick_Roll_Link_128k",
+  "artist": "ads",
+  "duration": 14.512471655328799,
+  "bpm": 112,
+  "difficulty": "easy",
+  "fileUrl": "https://jcmdhkudbcdjlxobvnxt.supabase.co/storage/v1/object/public/uploaded-songs/1769876475107-Rick_Roll_Link_128k.mp3",
+  "filePath": "1769876475107-Rick_Roll_Link_128k.mp3",
+  "pattern": {
+    "tiles": [
+      { "id": "tile-0", "lane": 1, "time": 0.72, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-1", "lane": 1, "time": 1.37, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-2", "lane": 2, "time": 2.41, "type": "normal", "beatStrength": 0.8 },
+      { "id": "tile-3", "lane": 1, "time": 3.48, "type": "normal", "beatStrength": 0.8 },
+      { "id": "tile-4", "lane": 2, "time": 4.53, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-5", "lane": 1, "time": 5.60, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-6", "lane": 2, "time": 6.64, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-7", "lane": 1, "time": 7.71, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-8", "lane": 2, "time": 8.75, "type": "normal", "beatStrength": 0.8 },
+      { "id": "tile-9", "lane": 1, "time": 9.82, "type": "normal", "beatStrength": 0.8 },
+      { "id": "tile-10", "lane": 2, "time": 10.87, "type": "normal", "beatStrength": 0.8 },
+      { "id": "tile-11", "lane": 1, "time": 11.94, "type": "normal", "beatStrength": 0.8 },
+      { "id": "tile-12", "lane": 2, "time": 12.98, "type": "normal", "beatStrength": 0.6 },
+      { "id": "tile-13", "lane": 1, "time": 13.51, "type": "normal", "beatStrength": 0.6 }
+    ],
+    "version": "1.0",
+    "metadata": {
+      "bpm": 112,
+      "artist": "ads",
+      "songId": "e7258a38-200b-4017-841c-f7c6e1a75abd",
+      "duration": 14.51,
+      "songTitle": "Rick_Roll_Link_128k",
+      "difficulty": "easy",
+      "generatedAt": "2026-01-31T16:21:29.969200+00:00",
+      "generatorVersion": "ai-openai-v1"
+    },
+    "settings": {
+      "hitZoneY": -8,
+      "laneCount": 4,
+      "tileSpeed": 6,
+      "spawnOffset": 4,
+      "hitTolerance": 0.15,
+      "playbackSpeed": 1
+    }
+  }
+}

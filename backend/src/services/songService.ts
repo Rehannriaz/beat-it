@@ -109,7 +109,7 @@ export const songService = {
       body: JSON.stringify({ audio_url: song.fileUrl }),
     });
 
-    const data: AnalyzeResponse = await response.json();
+    const data = (await response.json()) as AnalyzeResponse;
 
     if (!data.success || !data.features) {
       throw new AppError(data.error || 'Audio analysis failed', 500);
@@ -141,7 +141,7 @@ export const songService = {
       }),
     });
 
-    const data: GeneratePatternResponse = await response.json();
+    const data = (await response.json()) as GeneratePatternResponse;
 
     if (!data.success || !data.pattern) {
       throw new AppError(data.error || 'Pattern generation failed', 500);
