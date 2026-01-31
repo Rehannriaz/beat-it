@@ -12,4 +12,4 @@ class GeneratePatternRequest(BaseModel):
     artist: str
     difficulty: Literal["easy", "medium", "hard", "expert"]
     song_id: str
-    provider: Optional[Literal["openai", "gemini"]] = None
+    provider: Optional[Literal["openai", "gemini", "algorithmic"]] = None

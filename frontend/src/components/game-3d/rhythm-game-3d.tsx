@@ -42,6 +42,7 @@ export function RhythmGame3D() {
   const [usePattern, setUsePattern] = useState(true)
   const [uploadWizardOpen, setUploadWizardOpen] = useState(false)
   const [uploadedPattern, setUploadedPattern] = useState<GamePattern | null>(null)
+  const [uploadedSong, setUploadedSong] = useState<Song | null>(null)
 
   const { data: examplePattern, isLoading: patternLoading } = useExamplePattern()
 
@@ -50,10 +51,12 @@ export function RhythmGame3D() {
 
   const { gameState, startGame, pauseGame, endGame, mode } = useGame3D({
     pattern: usePattern ? activePattern : null,
-    mode: usePattern ? 'pattern' : 'endless'
+    mode: usePattern ? 'pattern' : 'endless',
+    audioUrl: uploadedSong?.fileUrl ?? null
   })
 
   const handleUploadComplete = (song: Song) => {
+    setUploadedSong(song)
     if (song.pattern) {
       setUploadedPattern(song.pattern)
       setUsePattern(true)

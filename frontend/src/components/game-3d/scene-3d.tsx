@@ -163,8 +163,8 @@ function SceneContent({ gameState, theme }: Scene3DProps) {
         />
       )}
       
-      {/* Fog for depth */}
-      <fog attach="fog" args={[themeBackgrounds[theme], 40, 90]} />
+      {/* Fog for depth - extended to see tiles at z=-70 */}
+      <fog attach="fog" args={[themeBackgrounds[theme], 60, 120]} />
     </>
   )
 }

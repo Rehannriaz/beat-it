@@ -51,6 +51,7 @@ export function StepGenerate({ theme, song, audioFeatures, onComplete }: StepGen
       const updatedSong = await generateMutation.mutateAsync({
         id: song.id,
         difficulty,
+        provider: 'algorithmic',
       })
       onComplete(updatedSong)
     } catch (error) {
@@ -133,7 +134,7 @@ export function StepGenerate({ theme, song, audioFeatures, onComplete }: StepGen
         {generateMutation.isPending ? (
           <>
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Generating with AI...
+            Generating Pattern...
           </>
         ) : (
           <>

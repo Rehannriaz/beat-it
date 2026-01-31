@@ -12,7 +12,7 @@ export interface Tile3D {
   missed: boolean
   type: 'normal' | 'hold' | 'rapid'
   beatStrength: number
-  targetTime: number // When tile should be hit (in seconds)
+  targetTime: number
 }
 
 export interface GameState3D {
@@ -23,14 +23,13 @@ export interface GameState3D {
   isPlaying: boolean
   isPaused: boolean
   gameOver: boolean
-  gameTime: number // Current game time in seconds
+  gameTime: number
   lastHitFeedback: { lane: number; type: 'perfect' | 'good' | 'miss'; time: number } | null
 }
 
-// Default settings (used when no pattern provided)
 const DEFAULT_SPEED = 15
 const DEFAULT_HIT_TOLERANCE = 3
-const DEFAULT_SPAWN_OFFSET = 4 // seconds before hit time to spawn
+const DEFAULT_SPAWN_OFFSET = 4
 
 const HIT_ZONE_Z = 0
 const SPAWN_DISTANCE = -70
@@ -38,16 +37,14 @@ const SPAWN_DISTANCE = -70
 export type UseGame3DOptions = {
   pattern?: GamePattern | null
   mode?: 'pattern' | 'endless'
+  audioUrl?: string | null
 }
 
 export function useGame3D(options: UseGame3DOptions = {}) {
-  const { pattern, mode = pattern ? 'pattern' : 'endless' } = options
+  const { pattern, mode = pattern ? 'pattern' : 'endless', audioUrl } = options
 
-  // Get spawn offset from pattern or default
   const spawnOffset = pattern?.settings?.spawnOffset ?? DEFAULT_SPAWN_OFFSET
 
-  // In pattern mode, speed must be calculated so tiles reach hit zone at exact target time
-  // Speed = distance / time = |SPAWN_DISTANCE| / spawnOffset
   const speed = mode === 'pattern' && pattern
     ? Math.abs(SPAWN_DISTANCE) / spawnOffset
     : DEFAULT_SPEED
@@ -73,23 +70,36 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   const lastTimeRef = useRef<number>(0)
   const spawnedTilesRef = useRef<Set<string>>(new Set())
 
-  // Store pattern in ref to avoid effect re-runs on object reference changes
   const patternRef = useRef(pattern)
   const modeRef = useRef(mode)
   const speedRef = useRef(speed)
   const spawnOffsetRef = useRef(spawnOffset)
   const hitToleranceRef = useRef(hitTolerance)
 
-  // Update refs when values change
   patternRef.current = pattern
   modeRef.current = mode
   speedRef.current = speed
   spawnOffsetRef.current = spawnOffset
   hitToleranceRef.current = hitTolerance
 
-  // For endless mode
   const endlessSpawnTimerRef = useRef<number>(0)
   const endlessTileIdRef = useRef<number>(0)
+
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    if (audioUrl) {
+      const audio = new Audio(audioUrl)
+      audio.preload = 'auto'
+      audioRef.current = audio
+
+      return () => {
+        audio.pause()
+        audio.src = ''
+        audioRef.current = null
+      }
+    }
+  }, [audioUrl])
 
   const hitTile = useCallback((lane: number) => {
     setGameState(prev => {
@@ -141,6 +151,29 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     spawnedTilesRef.current = new Set()
     endlessTileIdRef.current = 0
     endlessSpawnTimerRef.current = 0
+    lastTimeRef.current = performance.now()
+
+    const currentPattern = patternRef.current
+    console.log('[Game] Starting game', {
+      mode: modeRef.current,
+      hasPattern: !!currentPattern,
+      patternTiles: currentPattern?.tiles?.length ?? 0,
+      patternDuration: currentPattern?.metadata?.duration ?? 0,
+      patternBpm: currentPattern?.metadata?.bpm ?? 0,
+      firstTileTime: currentPattern?.tiles?.[0]?.time ?? 0,
+      lastTileTime: currentPattern?.tiles?.[currentPattern?.tiles?.length - 1]?.time ?? 0,
+      audioUrl: audioRef.current?.src ?? 'none'
+    })
+
+    const startTime = modeRef.current === 'pattern' ? -spawnOffsetRef.current : 0
+
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0
+      if (startTime >= 0) {
+        audioRef.current.play().catch(console.error)
+      }
+    }
+
     setGameState({
       tiles: [],
       score: 0,
@@ -149,23 +182,36 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       isPlaying: true,
       isPaused: false,
       gameOver: false,
-      gameTime: 0,
+      gameTime: startTime,
       lastHitFeedback: null
     })
   }, [])
 
   const pauseGame = useCallback(() => {
-    setGameState(prev => ({ ...prev, isPaused: !prev.isPaused }))
+    setGameState(prev => {
+      const newPaused = !prev.isPaused
+      if (audioRef.current) {
+        if (newPaused) {
+          audioRef.current.pause()
+        } else {
+          audioRef.current.play().catch(console.error)
+        }
+      }
+      return { ...prev, isPaused: newPaused }
+    })
   }, [])
 
   const endGame = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
     setGameState(prev => ({ ...prev, isPlaying: false, gameOver: true }))
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
     }
   }, [])
 
-  // Game loop
   useEffect(() => {
     if (!gameState.isPlaying || gameState.isPaused) return
 
@@ -174,31 +220,43 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       lastTimeRef.current = timestamp
 
       setGameState(prev => {
-        const newGameTime = prev.gameTime + deltaTime
+        let newGameTime = prev.gameTime + deltaTime
+
+        if (audioRef.current) {
+          if (prev.gameTime < 0 && newGameTime >= 0) {
+            audioRef.current.currentTime = 0
+            audioRef.current.play().catch(console.error)
+          }
+
+          if (!audioRef.current.paused && newGameTime >= 0) {
+            const audioTime = audioRef.current.currentTime
+            if (Math.abs(audioTime - newGameTime) > 0.1) {
+              newGameTime = audioTime
+            }
+          }
+        }
+
         let newTiles = [...prev.tiles]
 
-        // Spawn tiles based on mode (use refs to avoid stale closures)
         const currentMode = modeRef.current
         const currentPattern = patternRef.current
         const currentSpeed = speedRef.current
         const currentSpawnOffset = spawnOffsetRef.current
 
         if (currentMode === 'pattern' && currentPattern?.tiles) {
-          // Pattern mode: spawn tiles based on their time
+          const existingIds = new Set(newTiles.map(t => t.id))
+
           for (const patternTile of currentPattern.tiles) {
             const spawnTime = patternTile.time - currentSpawnOffset
 
             if (
               spawnTime <= newGameTime &&
-              !spawnedTilesRef.current.has(patternTile.id)
+              !existingIds.has(patternTile.id)
             ) {
-              spawnedTilesRef.current.add(patternTile.id)
+              existingIds.add(patternTile.id)
 
-              // Calculate initial Z position based on time until hit
-              // This handles tiles that should have spawned before game started
               const timeUntilHit = patternTile.time - newGameTime
               const idealZ = -(currentSpeed * timeUntilHit)
-              // Clamp to spawn distance (don't spawn past hit zone or too far)
               const initialZ = Math.max(SPAWN_DISTANCE, Math.min(-5, idealZ))
 
               newTiles.push({
@@ -214,7 +272,6 @@ export function useGame3D(options: UseGame3DOptions = {}) {
             }
           }
         } else {
-          // Endless mode: spawn randomly
           endlessSpawnTimerRef.current += deltaTime * 1000
           const spawnInterval = Math.max(350, 900 - currentSpeed * 20)
 
@@ -234,8 +291,19 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           }
         }
 
-        // Update tile positions
         const currentHitTolerance = hitToleranceRef.current
+
+        if (Math.floor(newGameTime) !== Math.floor(prev.gameTime) && newGameTime > -10) {
+          console.log('[Game] State at', newGameTime.toFixed(1) + 's:', {
+            activeTiles: newTiles.length,
+            spawned: spawnedTilesRef.current.size,
+            zRange: newTiles.length > 0 ? [
+              Math.min(...newTiles.map(t => t.z)).toFixed(1),
+              Math.max(...newTiles.map(t => t.z)).toFixed(1)
+            ] : 'none'
+          })
+        }
+
         const updatedTiles = newTiles
           .map(tile => ({
             ...tile,
@@ -249,7 +317,6 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           })
           .filter(tile => tile.z < 15)
 
-        // Check for missed tiles
         const newlyMissed = updatedTiles.filter(
           tile => tile.missed && !prev.tiles.find(t => t.id === tile.id)?.missed
         )
@@ -259,12 +326,21 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           newCombo = 0
         }
 
-        // Check if pattern is complete
-        if (currentMode === 'pattern' && currentPattern?.tiles) {
-          const allSpawned = currentPattern.tiles.every(t => spawnedTilesRef.current.has(t.id))
-          const allProcessed = updatedTiles.every(t => t.hit || t.missed)
+        if (currentMode === 'pattern' && currentPattern?.tiles && currentPattern.tiles.length > 0) {
+          const lastTileTime = currentPattern.tiles[currentPattern.tiles.length - 1]?.time ?? 0
+          const allTilesPassed = newGameTime > lastTileTime + 5
+          const noActiveTiles = updatedTiles.length === 0
+          const minGameTime = 3
 
-          if (allSpawned && allProcessed && updatedTiles.length === 0) {
+          if (allTilesPassed && noActiveTiles && newGameTime > minGameTime) {
+            console.log('[Game] Game Over', {
+              gameTime: newGameTime.toFixed(2),
+              lastTileTime: lastTileTime.toFixed(2)
+            })
+            if (audioRef.current) {
+              audioRef.current.pause()
+              audioRef.current.currentTime = 0
+            }
             return {
               ...prev,
               tiles: updatedTiles,
@@ -295,9 +371,8 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [gameState.isPlaying, gameState.isPaused]) // Using refs for pattern/mode/speed to avoid effect re-runs
+  }, [gameState.isPlaying, gameState.isPaused])
 
-  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!gameState.isPlaying) return
@@ -329,6 +404,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     endGame,
     hitTile,
     pattern,
-    mode
+    mode,
+    audioRef
   }
 }

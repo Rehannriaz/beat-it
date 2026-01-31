@@ -64,5 +64,5 @@ export type AudioFeatures = {
 
 export type GeneratePatternInput = {
   difficulty: 'easy' | 'medium' | 'hard' | 'expert';
-  provider?: 'openai' | 'gemini';
+  provider?: 'openai' | 'gemini' | 'algorithmic';
 };

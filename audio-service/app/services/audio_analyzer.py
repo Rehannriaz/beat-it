@@ -5,10 +5,14 @@ from ..models import AudioFeatures
 
 def analyze_audio(file_path: str) -> AudioFeatures:
     """Extract comprehensive audio features from an audio file using librosa."""
+    import os
+    file_size = os.path.getsize(file_path)
+    print(f"[Analyzer] File size: {file_size} bytes")
 
     # Load audio file
     y, sr = librosa.load(file_path, sr=22050)
     duration = librosa.get_duration(y=y, sr=sr)
+    print(f"[Analyzer] Loaded audio: {len(y)} samples, {sr} Hz, {duration:.2f} seconds")
 
     # BPM and beat detection
     tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
@@ -16,6 +20,7 @@ def analyze_audio(file_path: str) -> AudioFeatures:
 
     # Handle tempo as array or scalar
     bpm = float(tempo[0]) if hasattr(tempo, '__len__') else float(tempo)
+    print(f"[Analyzer] Found {len(beat_times)} beats, BPM: {bpm:.1f}")
 
     # Downbeat detection (first beat of each measure, assuming 4/4)
     downbeat_times = beat_times[::4] if len(beat_times) >= 4 else beat_times

@@ -121,7 +121,7 @@ export const songService = {
   async generatePattern(
     id: string,
     difficulty: string,
-    provider?: 'openai' | 'gemini'
+    provider?: 'openai' | 'gemini' | 'algorithmic'
   ): Promise<Song> {
     const song = await songRepository.findById(id);
     if (!song) {
