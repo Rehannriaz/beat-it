@@ -17,6 +17,7 @@ interface StartScreen3DProps {
   usePattern?: boolean
   onToggleMode?: () => void
   onUploadClick?: () => void
+  onSpotifyClick?: () => void
 }
 
 const themes: Theme[] = ['vaporwave', 'retro', 'cyberpunk', 'minimal']
@@ -29,7 +30,8 @@ export function StartScreen3D({
   patternLoading,
   usePattern = true,
   onToggleMode,
-  onUploadClick
+  onUploadClick,
+  onSpotifyClick
 }: StartScreen3DProps) {
   const styles = themeStyles[theme]
 
@@ -109,26 +111,42 @@ export function StartScreen3D({
         </motion.div>
       )}
 
-      {/* Upload button */}
-      {onUploadClick && (
+      {/* Upload and Spotify buttons */}
+      {(onUploadClick || onSpotifyClick) && (
         <motion.div
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.37 }}
-          className="mb-6"
+          className="flex gap-3 mb-6"
         >
-          <button
-            onClick={onUploadClick}
-            className="px-6 py-3 rounded-lg border-2 transition-all duration-300 flex items-center gap-2 hover:scale-105"
-            style={{
-              borderColor: styles.laneColors[2],
-              background: `${styles.laneColors[2]}20`,
-              color: styles.textColor,
-            }}
-          >
-            <Upload className="w-5 h-5" />
-            <span className="font-medium">Upload Your Song</span>
-          </button>
+          {onUploadClick && (
+            <button
+              onClick={onUploadClick}
+              className="px-6 py-3 rounded-lg border-2 transition-all duration-300 flex items-center gap-2 hover:scale-105"
+              style={{
+                borderColor: styles.laneColors[2],
+                background: `${styles.laneColors[2]}20`,
+                color: styles.textColor,
+              }}
+            >
+              <Upload className="w-5 h-5" />
+              <span className="font-medium">Upload Your Song</span>
+            </button>
+          )}
+          {onSpotifyClick && (
+            <button
+              onClick={onSpotifyClick}
+              className="px-6 py-3 rounded-lg border-2 transition-all duration-300 flex items-center gap-2 hover:scale-105"
+              style={{
+                borderColor: '#1DB954',
+                background: '#1DB95420',
+                color: styles.textColor,
+              }}
+            >
+              <Music className="w-5 h-5" style={{ color: '#1DB954' }} />
+              <span className="font-medium">Search Spotify</span>
+            </button>
+          )}
         </motion.div>
       )}
 

@@ -7,9 +7,12 @@ import { useGame3D, useExamplePattern } from '@/hooks'
 import { HUD3D } from './hud-3d'
 import { StartScreen3D, PauseScreen3D, GameOverScreen3D } from './overlays-3d'
 import { UploadWizard } from '@/components/upload-wizard'
+import { SpotifyWizard } from '@/components/spotify-wizard'
+import { SpotifyPlayer } from '@/components/spotify/spotify-player'
 import type { Theme } from '@/lib/game-types'
 import type { Song } from '@/types/api'
 import type { GamePattern } from '@/lib/pattern-types'
+import type { SpotifyTrack } from '@/lib/spotify/types'
 import { themeStyles } from '@/lib/game-types'
 
 // Dynamically import Scene3D to avoid SSR issues with Three.js
@@ -43,16 +46,20 @@ export function RhythmGame3D() {
   const [uploadWizardOpen, setUploadWizardOpen] = useState(false)
   const [uploadedPattern, setUploadedPattern] = useState<GamePattern | null>(null)
   const [uploadedSong, setUploadedSong] = useState<Song | null>(null)
+  const [spotifyWizardOpen, setSpotifyWizardOpen] = useState(false)
+  const [spotifyTrack, setSpotifyTrack] = useState<SpotifyTrack | null>(null)
+  const [spotifyPattern, setSpotifyPattern] = useState<GamePattern | null>(null)
+  const [spotifyPosition, setSpotifyPosition] = useState(0)
 
   const { data: examplePattern, isLoading: patternLoading } = useExamplePattern()
 
-  // Use uploaded pattern if available, otherwise use example pattern
-  const activePattern = uploadedPattern || examplePattern
+  // Use spotify pattern, uploaded pattern, or example pattern (in priority order)
+  const activePattern = spotifyPattern || uploadedPattern || examplePattern
 
   const { gameState, startGame, pauseGame, endGame, mode } = useGame3D({
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
-    audioUrl: uploadedSong?.fileUrl ?? null
+    audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
   })
 
   const handleUploadComplete = (song: Song) => {
@@ -62,6 +69,15 @@ export function RhythmGame3D() {
       setUsePattern(true)
     }
     setUploadWizardOpen(false)
+  }
+
+  const handleSpotifyComplete = (track: SpotifyTrack, pattern: GamePattern) => {
+    setSpotifyTrack(track)
+    setSpotifyPattern(pattern)
+    setUploadedPattern(null) // Clear uploaded if any
+    setUploadedSong(null)
+    setUsePattern(true)
+    setSpotifyWizardOpen(false)
   }
 
   return (
@@ -84,6 +100,24 @@ export function RhythmGame3D() {
         theme={theme}
       />
 
+      {/* Spotify Wizard */}
+      <SpotifyWizard
+        isOpen={spotifyWizardOpen}
+        onClose={() => setSpotifyWizardOpen(false)}
+        onComplete={handleSpotifyComplete}
+        theme={theme}
+      />
+
+      {/* Spotify player when playing Spotify track */}
+      {spotifyTrack && gameState.isPlaying && (
+        <div className="hidden">
+          <SpotifyPlayer
+            trackUri={spotifyTrack.uri}
+            onPositionChange={setSpotifyPosition}
+          />
+        </div>
+      )}
+
       {/* Overlays */}
       <AnimatePresence mode="wait">
         {!gameState.isPlaying && !gameState.gameOver && (
@@ -97,6 +131,7 @@ export function RhythmGame3D() {
             usePattern={usePattern}
             onToggleMode={() => setUsePattern(prev => !prev)}
             onUploadClick={() => setUploadWizardOpen(true)}
+            onSpotifyClick={() => setSpotifyWizardOpen(true)}
           />
         )}
 
