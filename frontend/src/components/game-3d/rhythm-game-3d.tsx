@@ -60,6 +60,7 @@ export function RhythmGame3D() {
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
     audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
+    spotifyPosition: spotifyTrack ? spotifyPosition : undefined,
   })
 
   const handleUploadComplete = (song: Song) => {
