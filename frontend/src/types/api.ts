@@ -45,3 +45,24 @@ export type UploadSongInput = {
   bpm?: number;
   difficulty?: string;
 };
+
+export type AudioFeatures = {
+  bpm: number;
+  duration: number;
+  beat_times: number[];
+  downbeat_times: number[];
+  onset_times: number[];
+  onset_strengths: number[];
+  energy_curve: number[];
+  energy_segments: { start: number; end: number; level: string }[];
+  bass_energy: number[];
+  mid_energy: number[];
+  high_energy: number[];
+  segments: { start: number; end: number; label: string }[];
+  intensity_curve: number[];
+};
+
+export type GeneratePatternInput = {
+  difficulty: 'easy' | 'medium' | 'hard' | 'expert';
+  provider?: 'openai' | 'gemini';
+};

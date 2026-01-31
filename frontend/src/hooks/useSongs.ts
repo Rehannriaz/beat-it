@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import type { Song, ApiResponse, UploadSongInput, GamePattern } from '@/types/api';
+import type { Song, ApiResponse, UploadSongInput, GamePattern, AudioFeatures, GeneratePatternInput } from '@/types/api';
 
 // Query key factory - enables precise cache invalidation
 export const songKeys = {
@@ -102,6 +102,33 @@ export function useDeleteSong() {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/songs/${id}`),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: songKeys.lists() });
+    },
+  });
+}
+
+// ANALYZE a song (extract audio features)
+export function useAnalyzeSong() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<ApiResponse<AudioFeatures>>(`/songs/${id}/analyze`, {});
+      return response.data;
+    },
+  });
+}
+
+// GENERATE pattern for a song using AI
+export function useGeneratePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...input }: GeneratePatternInput & { id: string }) => {
+      const response = await api.post<ApiResponse<Song>>(`/songs/${id}/generate-pattern`, input);
+      return response.data;
+    },
+    onSuccess: (data: Song) => {
+      queryClient.invalidateQueries({ queryKey: songKeys.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: songKeys.pattern(data.id) });
       queryClient.invalidateQueries({ queryKey: songKeys.lists() });
     },
   });

@@ -6,7 +6,10 @@ import dynamic from 'next/dynamic'
 import { useGame3D, useExamplePattern } from '@/hooks'
 import { HUD3D } from './hud-3d'
 import { StartScreen3D, PauseScreen3D, GameOverScreen3D } from './overlays-3d'
+import { UploadWizard } from '@/components/upload-wizard'
 import type { Theme } from '@/lib/game-types'
+import type { Song } from '@/types/api'
+import type { GamePattern } from '@/lib/pattern-types'
 import { themeStyles } from '@/lib/game-types'
 
 // Dynamically import Scene3D to avoid SSR issues with Three.js
@@ -37,12 +40,26 @@ function LoadingScreen({ theme }: { theme: Theme }) {
 export function RhythmGame3D() {
   const [theme, setTheme] = useState<Theme>('vaporwave')
   const [usePattern, setUsePattern] = useState(true)
+  const [uploadWizardOpen, setUploadWizardOpen] = useState(false)
+  const [uploadedPattern, setUploadedPattern] = useState<GamePattern | null>(null)
 
-  const { data: pattern, isLoading: patternLoading } = useExamplePattern()
+  const { data: examplePattern, isLoading: patternLoading } = useExamplePattern()
+
+  // Use uploaded pattern if available, otherwise use example pattern
+  const activePattern = uploadedPattern || examplePattern
+
   const { gameState, startGame, pauseGame, endGame, mode } = useGame3D({
-    pattern: usePattern ? pattern : null,
+    pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless'
   })
+
+  const handleUploadComplete = (song: Song) => {
+    if (song.pattern) {
+      setUploadedPattern(song.pattern)
+      setUsePattern(true)
+    }
+    setUploadWizardOpen(false)
+  }
 
   return (
     <div className="w-full h-screen relative overflow-hidden">
@@ -56,6 +73,14 @@ export function RhythmGame3D() {
         <HUD3D gameState={gameState} theme={theme} />
       )}
 
+      {/* Upload Wizard */}
+      <UploadWizard
+        isOpen={uploadWizardOpen}
+        onClose={() => setUploadWizardOpen(false)}
+        onComplete={handleUploadComplete}
+        theme={theme}
+      />
+
       {/* Overlays */}
       <AnimatePresence mode="wait">
         {!gameState.isPlaying && !gameState.gameOver && (
@@ -64,10 +89,11 @@ export function RhythmGame3D() {
             theme={theme}
             onStart={startGame}
             onThemeChange={setTheme}
-            pattern={pattern}
+            pattern={activePattern}
             patternLoading={patternLoading}
             usePattern={usePattern}
             onToggleMode={() => setUsePattern(prev => !prev)}
+            onUploadClick={() => setUploadWizardOpen(true)}
           />
         )}
 

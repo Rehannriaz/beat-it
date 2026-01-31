@@ -6,7 +6,7 @@ import type { Theme } from '@/lib/game-types'
 import type { GameState3D } from '@/hooks/use-game-3d'
 import type { GamePattern } from '@/lib/pattern-types'
 import { themeStyles, LANE_KEYS } from '@/lib/game-types'
-import { Play, Pause, RotateCcw, Home, Music, Infinity, Loader2 } from 'lucide-react'
+import { Play, Pause, RotateCcw, Home, Music, Infinity, Loader2, Upload } from 'lucide-react'
 
 interface StartScreen3DProps {
   theme: Theme
@@ -16,6 +16,7 @@ interface StartScreen3DProps {
   patternLoading?: boolean
   usePattern?: boolean
   onToggleMode?: () => void
+  onUploadClick?: () => void
 }
 
 const themes: Theme[] = ['vaporwave', 'retro', 'cyberpunk', 'minimal']
@@ -27,7 +28,8 @@ export function StartScreen3D({
   pattern,
   patternLoading,
   usePattern = true,
-  onToggleMode
+  onToggleMode,
+  onUploadClick
 }: StartScreen3DProps) {
   const styles = themeStyles[theme]
 
@@ -103,6 +105,29 @@ export function StartScreen3D({
           >
             <Infinity className="w-4 h-4" />
             <span className="text-sm font-medium">Endless</span>
+          </button>
+        </motion.div>
+      )}
+
+      {/* Upload button */}
+      {onUploadClick && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.37 }}
+          className="mb-6"
+        >
+          <button
+            onClick={onUploadClick}
+            className="px-6 py-3 rounded-lg border-2 transition-all duration-300 flex items-center gap-2 hover:scale-105"
+            style={{
+              borderColor: styles.laneColors[2],
+              background: `${styles.laneColors[2]}20`,
+              color: styles.textColor,
+            }}
+          >
+            <Upload className="w-5 h-5" />
+            <span className="font-medium">Upload Your Song</span>
           </button>
         </motion.div>
       )}
