@@ -13,6 +13,9 @@ const options: swaggerJsdoc.Options = {
       },
     },
     servers: [
+      ...(config.nodeEnv === 'production' && process.env.API_BASE_URL
+        ? [{ url: `${process.env.API_BASE_URL}/api`, description: 'Production server' }]
+        : []),
       {
         url: `http://localhost:${config.port}/api`,
         description: 'Development server',
@@ -129,6 +132,83 @@ const options: swaggerJsdoc.Options = {
             holdDuration: { type: 'number', description: 'Duration for hold tiles' },
             rapidCount: { type: 'integer', description: 'Number of taps for rapid tiles' },
             rapidInterval: { type: 'number', description: 'Interval between rapid taps' },
+          },
+        },
+        AudioFeatures: {
+          type: 'object',
+          description: 'Extracted audio features from analysis',
+          properties: {
+            bpm: { type: 'number', description: 'Detected beats per minute' },
+            duration: { type: 'number', description: 'Song duration in seconds' },
+            beat_times: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Timestamps of detected beats',
+            },
+            downbeat_times: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Timestamps of downbeats (first beat of each measure)',
+            },
+            onset_times: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Timestamps of sound onsets',
+            },
+            onset_strengths: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Strength of each onset (0-1)',
+            },
+            energy_curve: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Overall energy over time (sampled every 0.1s)',
+            },
+            energy_segments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  start: { type: 'number' },
+                  end: { type: 'number' },
+                  level: { type: 'string', enum: ['low', 'medium', 'high', 'peak'] },
+                },
+              },
+              description: 'Song sections with energy levels',
+            },
+            bass_energy: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Bass frequency energy over time',
+            },
+            mid_energy: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Mid frequency energy over time',
+            },
+            high_energy: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'High frequency energy over time',
+            },
+            segments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  start: { type: 'number' },
+                  end: { type: 'number' },
+                  label: { type: 'string' },
+                },
+              },
+              description: 'Detected song structure segments',
+            },
+            intensity_curve: {
+              type: 'array',
+              items: { type: 'number' },
+              description: 'Combined intensity metric over time',
+            },
           },
         },
       },

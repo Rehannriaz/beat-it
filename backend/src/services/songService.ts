@@ -1,7 +1,36 @@
 import { songRepository } from '../repositories/songRepository';
 import { uploadToStorage, deleteFromStorage } from '../config/supabase';
 import { AppError } from '../utils/AppError';
+import { config } from '../config';
 import type { Song, CreateSongInput, GamePattern } from '../types/song';
+
+interface AudioFeatures {
+  bpm: number;
+  duration: number;
+  beat_times: number[];
+  downbeat_times: number[];
+  onset_times: number[];
+  onset_strengths: number[];
+  energy_curve: number[];
+  energy_segments: { start: number; end: number; level: string }[];
+  bass_energy: number[];
+  mid_energy: number[];
+  high_energy: number[];
+  segments: { start: number; end: number; label: string }[];
+  intensity_curve: number[];
+}
+
+interface AnalyzeResponse {
+  success: boolean;
+  features?: AudioFeatures;
+  error?: string;
+}
+
+interface GeneratePatternResponse {
+  success: boolean;
+  pattern?: GamePattern;
+  error?: string;
+}
 
 export const songService = {
   async getAllSongs(): Promise<Song[]> {
@@ -66,5 +95,63 @@ export const songService = {
 
     await deleteFromStorage(song.filePath);
     await songRepository.delete(id);
+  },
+
+  async analyzeSong(id: string): Promise<AudioFeatures> {
+    const song = await songRepository.findById(id);
+    if (!song) {
+      throw new AppError('Song not found', 404);
+    }
+
+    const response = await fetch(`${config.audioService.url}/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ audio_url: song.fileUrl }),
+    });
+
+    const data = (await response.json()) as AnalyzeResponse;
+
+    if (!data.success || !data.features) {
+      throw new AppError(data.error || 'Audio analysis failed', 500);
+    }
+
+    return data.features;
+  },
+
+  async generatePattern(
+    id: string,
+    difficulty: string,
+    provider?: 'openai' | 'gemini'
+  ): Promise<Song> {
+    const song = await songRepository.findById(id);
+    if (!song) {
+      throw new AppError('Song not found', 404);
+    }
+
+    const response = await fetch(`${config.audioService.url}/generate-pattern`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio_url: song.fileUrl,
+        title: song.title,
+        artist: song.artist || 'Unknown',
+        difficulty,
+        song_id: song.id,
+        provider,
+      }),
+    });
+
+    const data = (await response.json()) as GeneratePatternResponse;
+
+    if (!data.success || !data.pattern) {
+      throw new AppError(data.error || 'Pattern generation failed', 500);
+    }
+
+    const updated = await songRepository.updatePattern(id, data.pattern);
+    if (!updated) {
+      throw new AppError('Failed to save pattern', 500);
+    }
+
+    return updated;
   },
 };

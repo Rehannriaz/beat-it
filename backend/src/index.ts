@@ -1,3 +1,7 @@
+// Force IPv4 DNS resolution (must be before any other imports that use network)
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,8 +16,13 @@ const app = express();
 // Middleware
 app.use(helmet({
   contentSecurityPolicy: false, // Disable for Swagger UI
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
 app.use(express.json());
 
 // Swagger UI
