@@ -249,10 +249,11 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           for (const patternTile of currentPattern.tiles) {
             const spawnTime = patternTile.time - currentSpawnOffset
 
-            if (
-              spawnTime <= newGameTime &&
-              !existingIds.has(patternTile.id)
-            ) {
+            const alreadyActive = existingIds.has(patternTile.id)
+            const alreadyProcessed = spawnedTilesRef.current.has(patternTile.id)
+
+            if (spawnTime <= newGameTime && !alreadyActive && !alreadyProcessed) {
+              spawnedTilesRef.current.add(patternTile.id)
               existingIds.add(patternTile.id)
 
               const timeUntilHit = patternTile.time - newGameTime
