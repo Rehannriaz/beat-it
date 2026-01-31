@@ -1,10 +1,18 @@
 import { Router } from 'express';
+import { db } from '../config/database';
 
 const router = Router();
 
 // Health check
-router.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+router.get('/health', async (req, res) => {
+  const dbHealthy = await db.healthCheck();
+  res.json({
+    status: dbHealthy ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    services: {
+      database: dbHealthy ? 'connected' : 'disconnected',
+    },
+  });
 });
 
 // Mount route modules

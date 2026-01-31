@@ -8,12 +8,14 @@ export const config = {
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
-    name: process.env.DB_NAME || 'database',
-    user: process.env.DB_USER || 'user',
-    password: process.env.DB_PASSWORD || '',
+    name: process.env.DB_NAME || 'hackathon_db',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || 'postgres',
   },
   jwt: {
     secret: process.env.JWT_SECRET || 'your-secret-key',
     expiresIn: process.env.JWT_EXPIRES_IN || '1d',
   },
 };
+
+export { db } from './database';
