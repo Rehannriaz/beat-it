@@ -19,7 +19,11 @@ export const config = {
   supabase: {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     bucket: process.env.SUPABASE_BUCKET || 'uploaded-songs',
+  },
+  audioService: {
+    url: process.env.AUDIO_SERVICE_URL || 'http://localhost:8000',
   },
 };
 

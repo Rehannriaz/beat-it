@@ -83,4 +83,31 @@ export const songController = {
       next(error);
     }
   },
+
+  async analyze(req: Request, res: Response, next: NextFunction) {
+    try {
+      const features = await songService.analyzeSong(req.params.id);
+      res.json({ data: features });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async generatePattern(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { difficulty, provider } = req.body;
+      if (!difficulty) {
+        throw new AppError('Difficulty is required', 400);
+      }
+
+      const song = await songService.generatePattern(
+        req.params.id,
+        difficulty,
+        provider
+      );
+      res.json({ data: song });
+    } catch (error) {
+      next(error);
+    }
+  },
 };

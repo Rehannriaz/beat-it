@@ -218,4 +218,89 @@ router.put('/:id/pattern', songController.updatePattern);
  */
 router.delete('/:id', songController.delete);
 
+/**
+ * @swagger
+ * /songs/{id}/analyze:
+ *   post:
+ *     summary: Analyze song audio
+ *     description: Extracts audio features (BPM, beats, energy levels) using the audio analysis service
+ *     tags:
+ *       - Songs
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Song ID
+ *     responses:
+ *       200:
+ *         description: Audio features extracted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   $ref: '#/components/schemas/AudioFeatures'
+ *       404:
+ *         description: Song not found
+ *       500:
+ *         description: Audio analysis failed
+ */
+router.post('/:id/analyze', songController.analyze);
+
+/**
+ * @swagger
+ * /songs/{id}/generate-pattern:
+ *   post:
+ *     summary: Generate game pattern with AI
+ *     description: Analyzes audio and generates a game pattern using AI (OpenAI or Gemini)
+ *     tags:
+ *       - Songs
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Song ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - difficulty
+ *             properties:
+ *               difficulty:
+ *                 type: string
+ *                 enum: [easy, medium, hard, expert]
+ *                 description: Difficulty level for pattern generation
+ *               provider:
+ *                 type: string
+ *                 enum: [openai, gemini]
+ *                 description: AI provider to use (defaults to openai)
+ *     responses:
+ *       200:
+ *         description: Pattern generated and saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   $ref: '#/components/schemas/Song'
+ *       400:
+ *         description: Invalid request (missing difficulty)
+ *       404:
+ *         description: Song not found
+ *       500:
+ *         description: Pattern generation failed
+ */
+router.post('/:id/generate-pattern', songController.generatePattern);
+
 export const songRoutes = router;
