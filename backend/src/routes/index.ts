@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../config/supabase';
 import { songRoutes } from './songRoutes';
 import { spotifyAuthRoutes } from './spotifyAuth';
+import { spotifyRoutes } from './spotifyRoutes';
 
 const router = Router();
 
@@ -77,6 +78,7 @@ router.get('/health', async (req, res) => {
 // Mount route modules
 router.use('/songs', songRoutes);
 router.use('/', spotifyAuthRoutes); // Spotify auth routes (callback and token exchange)
+router.use('/spotify', spotifyRoutes);
 
 /**
  * @swagger
