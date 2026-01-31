@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { db } from '../config/database';
+import { supabase } from '../config/supabase';
 import { songRoutes } from './songRoutes';
 import { spotifyAuthRoutes } from './spotifyAuth';
 
@@ -58,7 +58,13 @@ const examplePattern = {
  *               $ref: '#/components/schemas/HealthResponse'
  */
 router.get('/health', async (req, res) => {
-  const dbHealthy = await db.healthCheck();
+  let dbHealthy = false;
+  try {
+    const { error } = await supabase.from('songs').select('id').limit(1);
+    dbHealthy = !error;
+  } catch {
+    dbHealthy = false;
+  }
   res.json({
     status: dbHealthy ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),

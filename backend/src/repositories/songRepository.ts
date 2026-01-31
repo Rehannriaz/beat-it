@@ -1,4 +1,4 @@
-import { db } from '../config/database';
+import { supabase } from '../config/supabase';
 import type { Song, CreateSongInput, GamePattern } from '../types/song';
 
 const mapRowToSong = (row: any): Song => ({
@@ -17,48 +17,71 @@ const mapRowToSong = (row: any): Song => ({
 
 export const songRepository = {
   async findAll(): Promise<Song[]> {
-    const { rows } = await db.query(
-      'SELECT * FROM songs ORDER BY created_at DESC'
-    );
-    return rows.map(mapRowToSong);
+    const { data, error } = await supabase
+      .from('songs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(`Failed to fetch songs: ${error.message}`);
+    return (data || []).map(mapRowToSong);
   },
 
   async findById(id: string): Promise<Song | null> {
-    const { rows } = await db.query('SELECT * FROM songs WHERE id = $1', [id]);
-    return rows[0] ? mapRowToSong(rows[0]) : null;
+    const { data, error } = await supabase
+      .from('songs')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(`Failed to fetch song: ${error.message}`);
+    }
+    return data ? mapRowToSong(data) : null;
   },
 
   async create(input: CreateSongInput): Promise<Song> {
-    const { rows } = await db.query(
-      `INSERT INTO songs (title, artist, duration, bpm, difficulty, file_url, file_path)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [
-        input.title,
-        input.artist || null,
-        input.duration || null,
-        input.bpm || null,
-        input.difficulty || 'medium',
-        input.fileUrl,
-        input.filePath,
-      ]
-    );
-    return mapRowToSong(rows[0]);
+    const { data, error } = await supabase
+      .from('songs')
+      .insert({
+        title: input.title,
+        artist: input.artist || null,
+        duration: input.duration || null,
+        bpm: input.bpm || null,
+        difficulty: input.difficulty || 'medium',
+        file_url: input.fileUrl,
+        file_path: input.filePath,
+      })
+      .select()
+      .single();
+
+    if (error) throw new Error(`Failed to create song: ${error.message}`);
+    return mapRowToSong(data);
   },
 
   async updatePattern(id: string, pattern: GamePattern): Promise<Song | null> {
-    const { rows } = await db.query(
-      `UPDATE songs
-       SET pattern = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1
-       RETURNING *`,
-      [id, JSON.stringify(pattern)]
-    );
-    return rows[0] ? mapRowToSong(rows[0]) : null;
+    const { data, error } = await supabase
+      .from('songs')
+      .update({
+        pattern,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      throw new Error(`Failed to update pattern: ${error.message}`);
+    }
+    return data ? mapRowToSong(data) : null;
   },
 
   async delete(id: string): Promise<boolean> {
-    const { rowCount } = await db.query('DELETE FROM songs WHERE id = $1', [id]);
-    return (rowCount ?? 0) > 0;
+    const { error, count } = await supabase
+      .from('songs')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw new Error(`Failed to delete song: ${error.message}`);
+    return (count ?? 1) > 0;
   },
 };

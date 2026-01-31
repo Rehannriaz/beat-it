@@ -1,7 +1,3 @@
-// Force IPv4 DNS resolution (must be before any other imports that use network)
-import dns from 'dns';
-dns.setDefaultResultOrder('ipv4first');
-
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
