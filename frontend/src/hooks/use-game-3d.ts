@@ -244,17 +244,11 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         const currentSpawnOffset = spawnOffsetRef.current
 
         if (currentMode === 'pattern' && currentPattern?.tiles) {
-          const existingIds = new Set(newTiles.map(t => t.id))
-
           for (const patternTile of currentPattern.tiles) {
             const spawnTime = patternTile.time - currentSpawnOffset
 
-            const alreadyActive = existingIds.has(patternTile.id)
-            const alreadyProcessed = spawnedTilesRef.current.has(patternTile.id)
-
-            if (spawnTime <= newGameTime && !alreadyActive && !alreadyProcessed) {
+            if (spawnTime <= newGameTime && !spawnedTilesRef.current.has(patternTile.id)) {
               spawnedTilesRef.current.add(patternTile.id)
-              existingIds.add(patternTile.id)
 
               const timeUntilHit = patternTile.time - newGameTime
               const idealZ = -(currentSpeed * timeUntilHit)
@@ -328,15 +322,14 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         }
 
         if (currentMode === 'pattern' && currentPattern?.tiles && currentPattern.tiles.length > 0) {
-          const lastTileTime = currentPattern.tiles[currentPattern.tiles.length - 1]?.time ?? 0
-          const allTilesPassed = newGameTime > lastTileTime + 5
+          const allSpawned = spawnedTilesRef.current.size >= currentPattern.tiles.length
           const noActiveTiles = updatedTiles.length === 0
           const minGameTime = 3
 
-          if (allTilesPassed && noActiveTiles && newGameTime > minGameTime) {
+          if (allSpawned && noActiveTiles && newGameTime > minGameTime) {
             console.log('[Game] Game Over', {
               gameTime: newGameTime.toFixed(2),
-              lastTileTime: lastTileTime.toFixed(2)
+              spawned: spawnedTilesRef.current.size
             })
             if (audioRef.current) {
               audioRef.current.pause()
