@@ -38,10 +38,11 @@ export type UseGame3DOptions = {
   pattern?: GamePattern | null
   mode?: 'pattern' | 'endless'
   audioUrl?: string | null
+  spotifyPosition?: number
 }
 
 export function useGame3D(options: UseGame3DOptions = {}) {
-  const { pattern, mode = pattern ? 'pattern' : 'endless', audioUrl } = options
+  const { pattern, mode = pattern ? 'pattern' : 'endless', audioUrl, spotifyPosition } = options
 
   const spawnOffset = pattern?.settings?.spawnOffset ?? DEFAULT_SPAWN_OFFSET
 
@@ -86,6 +87,9 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   const endlessTileIdRef = useRef<number>(0)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const spotifyPositionRef = useRef(spotifyPosition)
+  spotifyPositionRef.current = spotifyPosition
 
   useEffect(() => {
     if (audioUrl) {
@@ -222,7 +226,16 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       setGameState(prev => {
         let newGameTime = prev.gameTime + deltaTime
 
-        if (audioRef.current) {
+        // Use Spotify position when provided, otherwise use audio element
+        const currentSpotifyPosition = spotifyPositionRef.current
+        if (currentSpotifyPosition !== undefined && newGameTime >= 0) {
+          // Spotify mode: sync to Spotify position (already in seconds)
+          const spotifyTime = currentSpotifyPosition
+          if (Math.abs(spotifyTime - newGameTime) > 0.1) {
+            newGameTime = spotifyTime
+          }
+        } else if (audioRef.current) {
+          // Audio element mode: existing logic for uploaded songs
           if (prev.gameTime < 0 && newGameTime >= 0) {
             audioRef.current.currentTime = 0
             audioRef.current.play().catch(console.error)
