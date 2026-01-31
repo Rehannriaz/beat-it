@@ -3,6 +3,8 @@
 // export * from './user';
 // export * from './api';
 
+export * from './spotify';
+
 export interface ApiResponse<T = unknown> {
   status: 'success' | 'error';
   data?: T;
