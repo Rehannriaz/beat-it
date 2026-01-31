@@ -54,7 +54,8 @@ export function Tile3DComponent({ tile, theme }: Tile3DProps) {
   useFrame((state) => {
     if (meshRef.current && !tile.hit && !tile.missed) {
       const time = state.clock.elapsedTime
-      const float = Math.sin(time * 3 + tile.id * 0.5) * 0.03
+      const tileNum = parseInt(tile.id.replace('tile-', ''), 10) || 0
+      const float = Math.sin(time * 3 + tileNum * 0.5) * 0.03
       meshRef.current.position.y = 0.4 + float
     }
   })

@@ -1,2 +1,3 @@
 // Export all hooks
-export * from './useHealth';
+export * from './use-game';
+export * from './use-game-3d';

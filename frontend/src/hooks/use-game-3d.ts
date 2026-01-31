@@ -46,7 +46,7 @@ export function useGame3D() {
     lastHitFeedback: null
   })
 
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | undefined>(undefined)
   const lastTimeRef = useRef<number>(0)
   const spawnTimerRef = useRef<number>(0)
   const tileIdRef = useRef<number>(0)
