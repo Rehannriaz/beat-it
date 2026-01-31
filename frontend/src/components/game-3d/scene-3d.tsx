@@ -84,7 +84,6 @@ function LaneKeyLabels({ theme }: { theme: Theme }) {
             color={colors.primary}
             anchorX="center"
             anchorY="middle"
-            font="/fonts/Geist-Bold.ttf"
           >
             {key}
           </Text>
