@@ -1,7 +1,17 @@
 import { Pool, PoolClient } from 'pg';
+import { lookup } from 'dns';
 import dotenv from 'dotenv';
 
 dotenv.config();
+
+// Force IPv4 to avoid ENETUNREACH on platforms without IPv6 support
+const ipv4Lookup = (
+  hostname: string,
+  options: object,
+  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void
+) => {
+  lookup(hostname, { family: 4 }, callback);
+};
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -22,6 +32,8 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
   ssl: isSupabase ? { rejectUnauthorized: false } : false,
+  // Force IPv4 for Supabase connections (many cloud platforms lack IPv6)
+  ...(isSupabase && { lookup: ipv4Lookup }),
 });
 
 pool.on('connect', () => {
