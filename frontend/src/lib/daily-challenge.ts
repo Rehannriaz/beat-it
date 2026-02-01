@@ -3,9 +3,6 @@
  * Uses date as seed to always select the same song for a given day
  */
 
-// Spotify's "Today's Top Hits" playlist ID
-export const TOP_HITS_PLAYLIST_ID = '37i9dQZF1DXcBWIGoYBM5M'
-
 /**
  * Hash a date string to get a deterministic index
  */
