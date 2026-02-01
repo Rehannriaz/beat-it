@@ -24,20 +24,20 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
-      {/* Score */}
+      {/* Score - compact on mobile to save space */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute top-2 sm:top-4 md:top-6 left-2 sm:left-4 md:left-6"
+        className="absolute top-1 sm:top-2 md:top-4 lg:top-6 left-1 sm:left-2 md:left-4 lg:left-6"
       >
         <p 
-          className="text-xs sm:text-sm uppercase tracking-widest opacity-60"
+          className="text-[10px] sm:text-xs md:text-sm uppercase tracking-widest opacity-60"
           style={{ color: styles.textColor }}
         >
           Score
         </p>
         <p 
-          className="text-2xl sm:text-3xl md:text-4xl font-bold tabular-nums"
+          className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold tabular-nums"
           style={{ 
             color: styles.textColor,
             textShadow: `0 0 20px ${styles.glowColor}`
@@ -47,14 +47,14 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
         </p>
       </motion.div>
 
-      {/* Combo */}
+      {/* Combo - compact on mobile to save space */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute top-2 sm:top-4 md:top-6 right-2 sm:right-4 md:right-6 text-right"
+        className="absolute top-1 sm:top-2 md:top-4 lg:top-6 right-1 sm:right-2 md:right-4 lg:right-6 text-right"
       >
         <p 
-          className="text-xs sm:text-sm uppercase tracking-widest opacity-60"
+          className="text-[10px] sm:text-xs md:text-sm uppercase tracking-widest opacity-60"
           style={{ color: styles.textColor }}
         >
           Combo
@@ -65,7 +65,7 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
             initial={{ scale: 1.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
-            className="text-2xl sm:text-3xl md:text-4xl font-bold tabular-nums"
+            className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold tabular-nums"
             style={{ 
               color: styles.laneColors[gameState.combo % 4],
               textShadow: `0 0 20px ${styles.laneColors[gameState.combo % 4]}`
@@ -76,7 +76,7 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
         </AnimatePresence>
       </motion.div>
 
-      {/* Combo text feedback */}
+      {/* Combo text feedback - smaller on mobile */}
       <AnimatePresence>
         {comboText && (
           <motion.div
@@ -85,10 +85,10 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 1.5, opacity: 0, y: -20 }}
             transition={{ type: 'spring', damping: 10 }}
-            className="absolute top-1/4 left-1/2 -translate-x-1/2 px-4"
+            className="absolute top-[15%] sm:top-1/4 left-1/2 -translate-x-1/2 px-4"
           >
             <p
-              className={`text-xl sm:text-2xl md:text-3xl font-bold ${styles.font}`}
+              className={`text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold ${styles.font}`}
               style={{
                 color: styles.laneColors[gameState.combo % 4],
                 textShadow: `0 0 30px ${styles.laneColors[gameState.combo % 4]}, 0 0 60px ${styles.laneColors[gameState.combo % 4]}`
@@ -132,28 +132,28 @@ export function HUD3D({ gameState, theme }: HUD3DProps) {
         )}
       </AnimatePresence>
 
-      {/* Speed indicator */}
+      {/* Speed indicator - minimal on mobile */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="absolute bottom-2 sm:bottom-4 md:bottom-6 left-2 sm:left-4 md:left-6"
+        className="absolute bottom-1 sm:bottom-2 md:bottom-4 lg:bottom-6 left-1 sm:left-2 md:left-4 lg:left-6"
       >
         <p 
-          className="text-[10px] sm:text-xs uppercase tracking-widest opacity-40"
+          className="text-[9px] sm:text-[10px] md:text-xs uppercase tracking-widest opacity-40"
           style={{ color: styles.textColor }}
         >
           Time: {gameState.gameTime.toFixed(1)}s
         </p>
       </motion.div>
 
-      {/* Controls hint */}
+      {/* Controls hint - hidden on mobile to save space */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="absolute bottom-2 sm:bottom-4 md:bottom-6 right-2 sm:right-4 md:right-6 hidden sm:block"
+        className="absolute bottom-1 sm:bottom-2 md:bottom-4 lg:bottom-6 right-1 sm:right-2 md:right-4 lg:right-6 hidden md:block"
       >
         <p 
-          className="text-[10px] sm:text-xs uppercase tracking-widest opacity-40"
+          className="text-[9px] sm:text-[10px] md:text-xs uppercase tracking-widest opacity-40"
           style={{ color: styles.textColor }}
         >
           D F J K to hit | ESC to pause

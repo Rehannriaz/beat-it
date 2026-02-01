@@ -1,10 +1,48 @@
 'use client'
 
 import { useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Mesh } from 'three'
 import type { Theme } from '@/lib/game-types'
+
+// Get responsive scale factor for mobile - scales entire scene down
+function useResponsiveScale() {
+  const { size } = useThree()
+  const width = size.width
+  
+  // Very small phones - scale down even more
+  if (width < 400) {
+    return 0.55 // Scale down to 55% on very small phones
+  }
+  // Mobile phones - scale everything down significantly
+  if (width < 640) {
+    return 0.65 // Scale down to 65% on mobile
+  }
+  // Small tablets
+  if (width < 768) {
+    return 0.8
+  }
+  // Tablets
+  if (width < 1024) {
+    return 0.9
+  }
+  // Normal size
+  return 1.0
+}
+
+// Get hit zone Z position - further from camera (more negative = further away/higher)
+function getHitZoneZ(scale: number): number {
+  // Negative Z values = further from camera (higher up on screen)
+  // Keep hit zone much further from camera to be higher on screen
+  if (scale < 0.7) {
+    return -2.0 // Much further from camera on mobile (higher on screen)
+  }
+  if (scale < 0.85) {
+    return -1.5 // Further from camera on small tablets
+  }
+  return -1.0 // Further from camera on desktop
+}
 
 interface RoadProps {
   theme: Theme
@@ -20,6 +58,7 @@ const themeColors: Record<Theme, { road: string; lines: string; glow: string; ac
 export function Road({ theme }: RoadProps) {
   const colors = themeColors[theme]
   const hitZoneRef = useRef<Mesh>(null)
+  const scale = useResponsiveScale()
 
   // Animate hit zone glow
   useFrame((state) => {
@@ -29,8 +68,9 @@ export function Road({ theme }: RoadProps) {
     }
   })
 
+  // Use consistent scale for all geometry - only scale X and Z, not Y
   return (
-    <group>
+    <group scale={[scale, scale, scale]}>
       {/* Main road surface with subtle reflection */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, -40]} receiveShadow>
         <planeGeometry args={[12, 100]} />
@@ -95,61 +135,47 @@ export function Road({ theme }: RoadProps) {
         </mesh>
       ))}
 
-      {/* Hit zone - animated glowing bar */}
-      <mesh 
-        ref={hitZoneRef}
-        rotation={[-Math.PI / 2, 0, 0]} 
-        position={[0, -0.3, 0.5]}
-      >
-        <planeGeometry args={[12, 1.5]} />
-        <meshStandardMaterial 
-          color={colors.glow}
-          emissive={colors.glow}
-          emissiveIntensity={1}
-          transparent
-          opacity={0.5}
-        />
-      </mesh>
-
-      {/* Lane hit zones - rounded targets */}
-      {['D', 'F', 'J', 'K'].map((key, i) => {
-        const laneX = -4.5 + i * 3
-        return (
-          <group key={key} position={[laneX, -0.25, 0.5]}>
-            {/* Outer ring */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]}>
-              <ringGeometry args={[1.0, 1.2, 32]} />
-              <meshStandardMaterial 
-                color={colors.lines}
-                emissive={colors.lines}
-                emissiveIntensity={0.9}
-                transparent
-                opacity={0.95}
-              />
-            </mesh>
-            {/* Inner ring */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-              <ringGeometry args={[0.6, 0.75, 32]} />
-              <meshStandardMaterial 
-                color={colors.accent}
-                emissive={colors.accent}
-                emissiveIntensity={0.5}
-                transparent
-                opacity={0.7}
-              />
-            </mesh>
-            {/* Center dot */}
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
-              <circleGeometry args={[0.2, 32]} />
-              <meshStandardMaterial 
-                color={colors.glow}
-                emissive={colors.glow}
-                emissiveIntensity={1}
-              />
-            </mesh>
-          </group>
-        )
-      })}
+      {/* Hit zone - 3D glowing bar with volume - width matches road (12) and scales with group */}
+      {/* Position at ground level (Y = -0.5) to attach to road surface */}
+      <group position={[0, -0.5, getHitZoneZ(scale)]}>
+        {/* Main 3D bar - width is 12 (road width), scales with parent group */}
+        {/* Position center of bar at Y = 0.15 so bottom sits on ground (Y = -0.5 + 0.15 - 0.15 = -0.5) */}
+        <mesh 
+          ref={hitZoneRef}
+          position={[0, 0.15, 0]}
+        >
+          <boxGeometry args={[12, 0.3, 1.8]} />
+          <meshStandardMaterial 
+            color={colors.glow}
+            emissive={colors.glow}
+            emissiveIntensity={1.2}
+            transparent
+            opacity={0.7}
+          />
+        </mesh>
+        {/* Top glow edge */}
+        <mesh position={[0, 0.3, 0]}>
+          <boxGeometry args={[12, 0.05, 1.8]} />
+          <meshStandardMaterial 
+            color={colors.glow}
+            emissive={colors.glow}
+            emissiveIntensity={1.8}
+            transparent
+            opacity={0.9}
+          />
+        </mesh>
+        {/* Bottom glow edge */}
+        <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[12, 0.05, 1.8]} />
+          <meshStandardMaterial 
+            color={colors.glow}
+            emissive={colors.glow}
+            emissiveIntensity={1.8}
+            transparent
+            opacity={0.9}
+          />
+        </mesh>
+      </group>
     </group>
   )
 }

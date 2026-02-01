@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useEffect } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Mesh } from 'three'
 import type { Theme } from '@/lib/game-types'
@@ -10,6 +10,7 @@ import type { Tile3D } from '@/hooks/use-game-3d'
 interface Tile3DProps {
   tile: Tile3D
   theme: Theme
+  onHit?: (lane: number) => void
 }
 
 const themeColors: Record<Theme, { tiles: string[]; glow: string[] }> = {
@@ -31,14 +32,34 @@ const themeColors: Record<Theme, { tiles: string[]; glow: string[] }> = {
   }
 }
 
-export function Tile3DComponent({ tile, theme }: Tile3DProps) {
+export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
   const meshRef = useRef<Mesh>(null)
+  const { size } = useThree()
   const [visible, setVisible] = useState(true)
   const [hitScale, setHitScale] = useState(1)
   const colors = themeColors[theme]
   const color = colors.tiles[tile.lane % 4]
   const glowColor = colors.glow[tile.lane % 4]
-  const laneX = -4.5 + tile.lane * 3
+  
+  // Calculate responsive scale based on screen size
+  const getScale = () => {
+    const width = size.width
+    // Very small phones - scale down even more
+    if (width < 400) return 0.55 // Scale down to 55% on very small phones
+    // Mobile: scale everything down significantly
+    if (width < 640) return 0.65 // Scale down to 65% on mobile
+    // Small tablets
+    if (width < 768) return 0.8
+    // Tablets
+    if (width < 1024) return 0.9
+    // Large screens: slightly smaller to fit more
+    if (width >= 1920) return 0.95
+    return 1.0
+  }
+  
+  const scale = getScale()
+  // Apply scale to lane position
+  const laneX = (-4.5 + tile.lane * 3) * scale
 
   useEffect(() => {
     if (tile.hit) {
@@ -53,18 +74,30 @@ export function Tile3DComponent({ tile, theme }: Tile3DProps) {
       const time = state.clock.elapsedTime
       const tileNum = parseInt(tile.id.replace(/\D/g, ''), 10) || 0
       const float = Math.sin(time * 3 + tileNum * 0.5) * 0.03
-      meshRef.current.position.y = 0.4 + float
+      // Lower tiles closer to the ground
+      meshRef.current.position.y = 0.15 + float
     }
   })
 
   if (!visible || tile.missed) return null
 
+  const baseScale = tile.hit ? hitScale * scale : scale
+  
+  const handleClick = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation()
+    if (onHit && !tile.hit && !tile.missed) {
+      onHit(tile.lane)
+    }
+  }
+
   return (
     <group position={[laneX, 0, tile.z]}>
       <mesh
         ref={meshRef}
-        position={[0, 0.4, 0]}
-        scale={tile.hit ? hitScale : 1}
+        position={[0, 0.15, 0]}
+        scale={baseScale}
+        onClick={handleClick}
+        onPointerDown={handleClick}
       >
         <boxGeometry args={[2.2, 0.6, 1.8]} />
         <meshStandardMaterial
@@ -77,8 +110,10 @@ export function Tile3DComponent({ tile, theme }: Tile3DProps) {
       </mesh>
 
       <mesh
-        position={[0, 0.72, 0]}
-        scale={tile.hit ? hitScale : 1}
+        position={[0, 0.47, 0]}
+        scale={baseScale}
+        onClick={handleClick}
+        onPointerDown={handleClick}
       >
         <boxGeometry args={[2.1, 0.08, 1.7]} />
         <meshStandardMaterial
