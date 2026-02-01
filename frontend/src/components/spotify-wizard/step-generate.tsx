@@ -85,12 +85,28 @@ export function StepGenerate({ theme, track, onComplete }: StepGenerateProps) {
               key={d}
               onClick={() => setDifficulty(d)}
               disabled={generateMutation.isPending}
-              className={`p-4 rounded-xl border-2 text-left transition-all duration-300 ${
-                difficulty === d ? 'scale-[1.02]' : 'opacity-60 hover:opacity-80'
+              className={`p-4 rounded-xl border-2 text-left transition-all duration-300 cursor-pointer ${
+                difficulty === d ? 'scale-[1.02]' : 'opacity-60 hover:opacity-100 hover:scale-[1.02]'
               }`}
               style={{
-                borderColor: difficulty === d ? difficultyInfo[d].color : 'transparent',
-                background: difficulty === d ? `${difficultyInfo[d].color}15` : 'rgba(255,255,255,0.05)',
+                borderColor: difficulty === d 
+                  ? difficultyInfo[d].color 
+                  : 'transparent',
+                background: difficulty === d 
+                  ? `${difficultyInfo[d].color}15` 
+                  : 'rgba(255,255,255,0.05)',
+              }}
+              onMouseEnter={(e) => {
+                if (difficulty !== d && !generateMutation.isPending) {
+                  e.currentTarget.style.borderColor = `${difficultyInfo[d].color}60`;
+                  e.currentTarget.style.background = `${difficultyInfo[d].color}10`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (difficulty !== d) {
+                  e.currentTarget.style.borderColor = 'transparent';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                }
               }}
             >
               <p className="font-bold text-lg" style={{ color: difficultyInfo[d].color }}>
@@ -113,8 +129,18 @@ export function StepGenerate({ theme, track, onComplete }: StepGenerateProps) {
       <Button
         onClick={handleGenerate}
         disabled={generateMutation.isPending}
-        className="w-full"
+        className="w-full transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer disabled:hover:scale-100"
         style={{ background: styles.glowColor, color: '#000' }}
+        onMouseEnter={(e) => {
+          if (!generateMutation.isPending) {
+            e.currentTarget.style.filter = 'brightness(1.1)';
+            e.currentTarget.style.boxShadow = `0 0 20px ${styles.glowColor}60`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.filter = 'brightness(1)';
+          e.currentTarget.style.boxShadow = 'none';
+        }}
       >
         {generateMutation.isPending ? (
           <>

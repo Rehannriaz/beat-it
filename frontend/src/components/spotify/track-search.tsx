@@ -57,7 +57,7 @@ export function TrackSearch({ onTrackSelect }: TrackSearchProps) {
   }
 
   return (
-    <div className="w-full max-w-2xl">
+    <div className="w-full max-w-4xl">
       <form onSubmit={handleSubmit} className="flex gap-2 mb-3 sm:mb-4">
         <div className="flex-1 relative">
           <Search className="absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
@@ -66,10 +66,16 @@ export function TrackSearch({ onTrackSelect }: TrackSearchProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for a song..."
-            className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 text-sm sm:text-base bg-white/10 backdrop-blur-sm text-white border border-white/20 rounded-md placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white/15"
           />
         </div>
-        <Button type="submit" disabled={isSearching || !query.trim()} size="icon" className="flex-shrink-0">
+        <Button 
+          type="submit" 
+          disabled={isSearching || !query.trim()} 
+          size="icon" 
+          variant="default"
+          className="flex-shrink-0 h-[2.5rem] bg-blue-600 hover:bg-blue-500 text-white transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100 disabled:opacity-50 cursor-pointer"
+        >
           {isSearching ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -90,7 +96,7 @@ export function TrackSearch({ onTrackSelect }: TrackSearchProps) {
             <button
               key={track.id}
               onClick={() => onTrackSelect(track)}
-              className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-muted rounded-md transition-colors text-left"
+              className="w-full flex items-center gap-2 sm:gap-3 p-2 sm:p-3 hover:bg-blue-500/20 rounded-md transition-colors text-left group cursor-pointer"
             >
               {track.album.images[0] ? (
                 <img
@@ -104,7 +110,7 @@ export function TrackSearch({ onTrackSelect }: TrackSearchProps) {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate text-sm sm:text-base">{track.name}</p>
+                <p className="font-medium truncate text-sm sm:text-base text-white group-hover:text-white">{track.name}</p>
                 <p className="text-xs sm:text-sm text-muted-foreground truncate">
                   {track.artists.map(a => a.name).join(', ')}
                 </p>
