@@ -52,8 +52,8 @@ export function LeaderboardList({
           style={{
             background: entry.is_current_user ? `${glowColor}20` : 'rgba(255,255,255,0.05)',
             color: textColor,
-            ringColor: entry.is_current_user ? glowColor : undefined,
-          }}
+            '--tw-ring-color': entry.is_current_user ? glowColor : undefined,
+          } as React.CSSProperties}
         >
           <div className="w-6 flex justify-center">
             {getRankIcon(entry.rank)}
