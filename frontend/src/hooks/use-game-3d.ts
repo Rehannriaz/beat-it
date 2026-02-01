@@ -141,6 +141,11 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   
   // Track if we've synced with Spotify for the first time
   const spotifySyncedRef = useRef(false)
+  
+  // Smoothing/interpolation for Spotify position
+  const lastSpotifyPositionRef = useRef<number | undefined>(undefined)
+  const lastSpotifyPositionTimeRef = useRef<number>(0)
+  const smoothedSpotifyPositionRef = useRef<number | undefined>(undefined)
 
   // Throttling for button presses to prevent spam from slowing down animation
   const lastHitTimeRef = useRef<Record<number, number>>({})
@@ -399,6 +404,11 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     spawnedTilesRef.current = new Set()
     endlessTileIdRef.current = 0
     endlessSpawnTimerRef.current = 0
+    // Reset Spotify sync and smoothing state
+    spotifySyncedRef.current = false
+    lastSpotifyPositionRef.current = undefined
+    lastSpotifyPositionTimeRef.current = 0
+    smoothedSpotifyPositionRef.current = undefined
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
     }
@@ -717,6 +727,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
   // Debug info for UI
   const currentSpotifyPos = spotifyPositionRef.current
+  const smoothedPos = smoothedSpotifyPositionRef.current
   const isUsingSpotify = currentSpotifyPos !== undefined
   const canSpawnDebug = isUsingSpotify
     ? (currentSpotifyPos !== undefined && 
@@ -725,9 +736,35 @@ export function useGame3D(options: UseGame3DOptions = {}) {
        gameState.gameTime >= -(pattern?.settings?.spawnOffset ?? DEFAULT_SPAWN_OFFSET))
     : true
   
+  // Calculate sync metrics
+  const syncDifference = isUsingSpotify && currentSpotifyPos !== undefined
+    ? gameState.gameTime - currentSpotifyPos
+    : null
+  const smoothedSyncDifference = isUsingSpotify && smoothedPos !== undefined
+    ? gameState.gameTime - smoothedPos
+    : null
+  
+  // Track jitter (variation in sync difference) - simple moving average
+  const jitterRef = useRef<number[]>([])
+  if (syncDifference !== null) {
+    jitterRef.current.push(Math.abs(syncDifference))
+    if (jitterRef.current.length > 60) { // Keep last 60 frames (~1 second at 60fps)
+      jitterRef.current.shift()
+    }
+  }
+  const avgJitter = jitterRef.current.length > 0
+    ? jitterRef.current.reduce((a, b) => a + b, 0) / jitterRef.current.length
+    : 0
+  
+  // Estimate latency (time since last position update)
+  const latency = isUsingSpotify && lastSpotifyPositionTimeRef.current > 0
+    ? (performance.now() - lastSpotifyPositionTimeRef.current) / 1000
+    : null
+  
   const debugInfo = {
     gameTime: gameState.gameTime,
     spotifyPosition: currentSpotifyPos,
+    smoothedPosition: smoothedPos,
     spotifySynced: spotifySyncedRef.current,
     isUsingSpotify: isUsingSpotify,
     spawnedTilesCount: spawnedTilesRef.current.size,
@@ -736,7 +773,27 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     canSpawn: canSpawnDebug,
     spawnOffset: pattern?.settings?.spawnOffset ?? DEFAULT_SPAWN_OFFSET,
     firstTileTime: pattern?.tiles?.[0]?.time ?? 0,
-    nextTileToSpawn: pattern?.tiles?.find(t => !spawnedTilesRef.current.has(t.id))?.time ?? null
+    nextTileToSpawn: (() => {
+      if (!pattern?.tiles) return null
+      // Find next tile that hasn't been spawned yet, sorted by time
+      const sortedTiles = [...pattern.tiles].sort((a, b) => a.time - b.time)
+      const nextTile = sortedTiles.find(t => !spawnedTilesRef.current.has(t.id) && t.time > gameState.gameTime)
+      return nextTile?.time ?? null
+    })(),
+    // Debug: show first few tiles of pattern
+    firstFewTiles: pattern?.tiles?.slice(0, 10).map(t => ({ time: t.time, lane: t.lane, type: t.type })) ?? [],
+    // Check if pattern tiles are sorted
+    tilesSorted: (() => {
+      if (!pattern?.tiles || pattern.tiles.length < 2) return true
+      for (let i = 1; i < pattern.tiles.length; i++) {
+        if (pattern.tiles[i].time < pattern.tiles[i - 1].time) return false
+      }
+      return true
+    })(),
+    syncDifference: syncDifference,
+    smoothedSyncDifference: smoothedSyncDifference,
+    jitter: avgJitter,
+    latency: latency
   }
 
   return {

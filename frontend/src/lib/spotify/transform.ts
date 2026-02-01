@@ -120,6 +120,50 @@ function normalizeLoudness(loudness: number): number {
 }
 
 /**
+ * Get interpolated value at a specific time from variable-length segments.
+ * Segments have { start, duration, value } and this finds the value at any time.
+ */
+function getValueAtTime<T extends { start: number; duration: number }>(
+  segments: T[],
+  time: number,
+  getValue: (seg: T) => number,
+  defaultValue: number = 0.5
+): number {
+  for (const seg of segments) {
+    if (time >= seg.start && time < seg.start + seg.duration) {
+      return getValue(seg);
+    }
+  }
+  // If past all segments, use last segment's value
+  if (segments.length > 0 && time >= segments[segments.length - 1].start) {
+    return getValue(segments[segments.length - 1]);
+  }
+  return defaultValue;
+}
+
+/**
+ * Create evenly-spaced array by sampling from variable-length segments.
+ * This ensures consistent sampling for the algorithmic pattern generator.
+ */
+function createEvenlySpacedCurve<T extends { start: number; duration: number }>(
+  segments: T[],
+  duration: number,
+  getValue: (seg: T) => number,
+  intervalMs: number = 100
+): number[] {
+  const intervalSec = intervalMs / 1000;
+  const numPoints = Math.ceil(duration / intervalSec);
+  const curve: number[] = [];
+
+  for (let i = 0; i < numPoints; i++) {
+    const time = i * intervalSec;
+    curve.push(getValueAtTime(segments, time, getValue, 0.5));
+  }
+
+  return curve;
+}
+
+/**
  * Transform Spotify Audio Analysis to AudioFeatures format.
  */
 export function transformSpotifyAnalysis(
@@ -133,40 +177,72 @@ export function transformSpotifyAnalysis(
   // Extract downbeat times (first beat of each bar)
   const downbeat_times = bars.map((b) => b.start);
 
-  // Use segment boundaries as onset times
-  const onset_times = segments.map((s) => s.start);
+  // Use tatums (sub-beat divisions) as onset times - they're more frequent and rhythmically accurate
+  // Tatums are typically 2-4x more frequent than beats, giving us better granularity
+  // Fallback to beats if tatums are not available
+  const { tatums } = analysis;
+  console.log('[Transform] Tatums available:', tatums?.length ?? 0, 'beats:', beat_times.length);
+  const onset_times = tatums && tatums.length > 0 
+    ? tatums.map((t) => t.start)
+    : beat_times; // Fallback to beats if no tatums
+  console.log('[Transform] Using', onset_times.length, 'onset times (from', tatums && tatums.length > 0 ? 'tatums' : 'beats', ')');
 
-  // Normalize segment loudness for onset strengths
+  // Calculate onset strengths from segment loudness at each onset time
+  // For each onset, find the segment it belongs to and use its loudness
   const maxSegmentLoudness = Math.max(...segments.map((s) => s.loudness_max));
   const minSegmentLoudness = Math.min(...segments.map((s) => s.loudness_max));
   const loudnessRange = maxSegmentLoudness - minSegmentLoudness || 1;
 
-  const onset_strengths = segments.map(
-    (s) => (s.loudness_max - minSegmentLoudness) / loudnessRange
-  );
-
-  // Build energy arrays from segment pitches
-  // Pitches are 12 values (C, C#, D, ..., B) with values 0-1
-  // Group into bass (0-3), mid (4-7), high (8-11)
-  const bass_energy: number[] = [];
-  const mid_energy: number[] = [];
-  const high_energy: number[] = [];
-
-  segments.forEach((seg) => {
-    const pitches = seg.pitches;
-    const bass = (pitches[0] + pitches[1] + pitches[2] + pitches[3]) / 4;
-    const mid = (pitches[4] + pitches[5] + pitches[6] + pitches[7]) / 4;
-    const high = (pitches[8] + pitches[9] + pitches[10] + pitches[11]) / 4;
-    bass_energy.push(bass);
-    mid_energy.push(mid);
-    high_energy.push(high);
+  const onset_strengths = onset_times.map((onsetTime) => {
+    // Find the segment that contains this onset time
+    const segment = segments.find(
+      (s) => onsetTime >= s.start && onsetTime < s.start + s.duration
+    );
+    if (segment) {
+      return (segment.loudness_max - minSegmentLoudness) / loudnessRange;
+    }
+    // Default strength if no segment found
+    return 0.5;
   });
 
-  // Build intensity curve from segment loudness
-  const intensity_curve = segments.map((s) => normalizeLoudness(s.loudness_max));
+  // Build evenly-spaced curves (100ms intervals) for consistent pattern generation
+  // This matches the format produced by audio_analyzer.py for uploaded files
+  const intervalMs = 100;
 
-  // Build energy curve (same as intensity for now)
+  // Build intensity curve from segment loudness (evenly spaced)
+  const intensity_curve = createEvenlySpacedCurve(
+    segments,
+    track.duration,
+    (seg) => normalizeLoudness(seg.loudness_max),
+    intervalMs
+  );
+
+  // Build energy curve (same as intensity)
   const energy_curve = [...intensity_curve];
+
+  // Build frequency band energy arrays (evenly spaced)
+  // Pitches are 12 values (C, C#, D, ..., B) with values 0-1
+  // Group into bass (0-3), mid (4-7), high (8-11)
+  const bass_energy = createEvenlySpacedCurve(
+    segments,
+    track.duration,
+    (seg) => (seg.pitches[0] + seg.pitches[1] + seg.pitches[2] + seg.pitches[3]) / 4,
+    intervalMs
+  );
+
+  const mid_energy = createEvenlySpacedCurve(
+    segments,
+    track.duration,
+    (seg) => (seg.pitches[4] + seg.pitches[5] + seg.pitches[6] + seg.pitches[7]) / 4,
+    intervalMs
+  );
+
+  const high_energy = createEvenlySpacedCurve(
+    segments,
+    track.duration,
+    (seg) => (seg.pitches[8] + seg.pitches[9] + seg.pitches[10] + seg.pitches[11]) / 4,
+    intervalMs
+  );
 
   // Build energy segments (simplified)
   const energy_segments = sections.map((sec) => ({

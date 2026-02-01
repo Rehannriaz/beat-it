@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { Loader2, Sparkles, Music } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSpotifyPattern } from '@/hooks/useSpotifyPattern';
+import { SpotifyAPIDebug } from '@/components/spotify/spotify-api-debug';
 import type { Theme } from '@/lib/game-types';
 import type { SpotifyTrack } from '@/lib/spotify/types';
 import type { GamePattern } from '@/lib/pattern-types';
@@ -125,6 +126,16 @@ export function StepGenerate({ theme, track, onComplete }: StepGenerateProps) {
           Generation failed. Please try again.
         </p>
       )}
+
+      {/* Debug panel - collapsible */}
+      <details className="mt-4">
+        <summary className="text-sm opacity-60 cursor-pointer hover:opacity-100" style={{ color: styles.textColor }}>
+          🔍 Debug: Test Spotify APIs
+        </summary>
+        <div className="mt-2">
+          <SpotifyAPIDebug track={track} />
+        </div>
+      </details>
 
       <Button
         onClick={handleGenerate}

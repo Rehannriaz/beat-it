@@ -95,6 +95,9 @@ class AlgorithmicPatternGenerator:
 
     def _build_candidates(self) -> list[dict]:
         candidates = []
+        
+        # Debug: log how many beats/onsets we have
+        print(f"[PatternGen] Building candidates: {len(self.features.beat_times)} beats, {len(self.features.onset_times)} onsets")
 
         for t in self.features.beat_times:
             is_downbeat = any(abs(t - db) < 0.05 for db in self.features.downbeat_times)
@@ -115,6 +118,9 @@ class AlgorithmicPatternGenerator:
                 })
 
         candidates.sort(key=lambda x: x["time"])
+        print(f"[PatternGen] Total candidates after merge: {len(candidates)}")
+        if len(candidates) > 0:
+            print(f"[PatternGen] First 10 candidate times: {[c['time'] for c in candidates[:10]]}")
         return candidates
 
     def _get_intensity_at(self, time: float) -> float:
@@ -146,10 +152,15 @@ class AlgorithmicPatternGenerator:
     def _filter_candidates(self, candidates: list[dict]) -> list[dict]:
         filtered = []
         last_time = -999
+        skipped_count = 0
+        downbeat_count = 0
+        beat_count = 0
+        onset_count = 0
 
         for c in candidates:
             if c["time"] - last_time < self.config["min_spacing"]:
                 if not c.get("is_downbeat"):
+                    skipped_count += 1
                     continue
 
             intensity = self._get_intensity_at(c["time"])
@@ -158,18 +169,24 @@ class AlgorithmicPatternGenerator:
             if c.get("is_downbeat"):
                 filtered.append({**c, "intensity": intensity, **thresholds})
                 last_time = c["time"]
+                downbeat_count += 1
                 continue
 
             if c["source"] == "beat" and intensity >= thresholds["intensity_threshold"]:
                 filtered.append({**c, "intensity": intensity, **thresholds})
                 last_time = c["time"]
+                beat_count += 1
                 continue
 
             if c["source"] == "onset":
                 if c["strength"] >= self.config["onset_threshold"] and intensity >= thresholds["intensity_threshold"]:
                     filtered.append({**c, "intensity": intensity, **thresholds})
                     last_time = c["time"]
+                    onset_count += 1
 
+        print(f"[PatternGen] Filtered: {len(filtered)} tiles (downbeats: {downbeat_count}, beats: {beat_count}, onsets: {onset_count}, skipped: {skipped_count})")
+        if len(filtered) > 0:
+            print(f"[PatternGen] First 10 filtered times: {[c['time'] for c in filtered[:10]]}")
         return filtered
 
     def _get_lane(self, time: float, recent_lanes: list[int]) -> int:
@@ -233,18 +250,43 @@ class AlgorithmicPatternGenerator:
     def _create_tiles(self, candidates: list[dict]) -> list[TileData]:
         tiles = []
         recent_lanes = []
+        # Track recent holds: list of (end_time, lane) to prevent same-lane holds within 1 second
+        recent_holds: list[tuple[float, int]] = []
 
         for i, c in enumerate(candidates):
-            lane = self._get_lane(c["time"], recent_lanes)
-            recent_lanes.append(lane)
-            if len(recent_lanes) > 3:
-                recent_lanes.pop(0)
-
             tile_type, type_extras = self._get_tile_type(
                 c["time"],
                 c.get("allow_holds", False),
                 c.get("allow_rapids", False),
             )
+
+            # Get initial lane suggestion
+            lane = self._get_lane(c["time"], recent_lanes)
+
+            # For hold tiles, avoid lanes that had a hold end within the last 1 second
+            if tile_type == "hold":
+                blocked_lanes = set()
+                for hold_end_time, hold_lane in recent_holds:
+                    # Block lane if hold ended within 1 second of this tile's start
+                    if c["time"] - hold_end_time < 1.0:
+                        blocked_lanes.add(hold_lane)
+
+                # If chosen lane is blocked, pick a different one
+                if lane in blocked_lanes:
+                    available_lanes = [l for l in range(4) if l not in blocked_lanes]
+                    if available_lanes:
+                        lane = random.choice(available_lanes)
+                    # If all lanes blocked, keep original (rare edge case)
+
+                # Track this hold's end time
+                hold_duration = type_extras.get("holdDuration", 0.5)
+                recent_holds.append((c["time"] + hold_duration, lane))
+                # Clean up old holds (older than 2 seconds)
+                recent_holds = [(t, l) for t, l in recent_holds if c["time"] - t < 2.0]
+
+            recent_lanes.append(lane)
+            if len(recent_lanes) > 3:
+                recent_lanes.pop(0)
 
             beat_strength = min(1.0, max(0.3, c["intensity"] * 0.7 + c["strength"] * 0.3))
 

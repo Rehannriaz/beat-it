@@ -176,42 +176,80 @@ export function Tile3DComponent({ tile, theme, speed, onHit }: Tile3DProps) {
         />
       </mesh>
 
-      {/* Hold tile tail */}
+      {/* Hold tile - simple thin 2D arrow */}
       {tile.type === 'hold' && holdTailLength > 0 && (
-        <mesh
-          position={[0, 0.1, -holdTailLength / 2 - 0.9]}
-          scale={[baseScale, baseScale, 1]}
-        >
-          <boxGeometry args={[1.8, 0.3, holdTailLength]} />
-          <meshStandardMaterial
-            color={color}
-            emissive={color}
-            emissiveIntensity={tile.isHolding ? 0.4 : 0.15}
-            metalness={0.1}
-            roughness={0.5}
-            transparent
-            opacity={spawnOpacity * 0.7}
-          />
-        </mesh>
-      )}
-
-      {/* Hold tile tail glow stripe */}
-      {tile.type === 'hold' && holdTailLength > 0 && (
-        <mesh
-          position={[0, 0.27, -holdTailLength / 2 - 0.9]}
-          scale={[baseScale, baseScale, 1]}
-        >
-          <boxGeometry args={[1.6, 0.06, holdTailLength]} />
-          <meshStandardMaterial
-            color={glowColor}
-            emissive={glowColor}
-            emissiveIntensity={tile.isHolding ? 0.5 : 0.2}
-            metalness={0.05}
-            roughness={0.3}
-            transparent
-            opacity={spawnOpacity * 0.6}
-          />
-        </mesh>
+        <>
+          {/* Thin arrow shaft */}
+          <mesh
+            position={[0, 0.2, -holdTailLength / 2 - 0.9]}
+            scale={[baseScale, 1, 1]}
+          >
+            <boxGeometry args={[0.25, 0.08, holdTailLength]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={tile.isHolding ? 0.5 : 0.25}
+              metalness={0.1}
+              roughness={0.4}
+              transparent
+              opacity={spawnOpacity * 0.9}
+            />
+          </mesh>
+          {/* Glowing streak when holding perfectly */}
+          {tile.isHolding && (
+            <mesh
+              position={[0, 0.2, -holdTailLength / 2 - 0.9]}
+              scale={[baseScale, 1, 1]}
+            >
+              <boxGeometry args={[0.6, 0.15, holdTailLength]} />
+              <meshStandardMaterial
+                color={glowColor}
+                emissive={glowColor}
+                emissiveIntensity={1.2}
+                metalness={0}
+                roughness={0.2}
+                transparent
+                opacity={0.6}
+              />
+            </mesh>
+          )}
+          {/* Simple triangle arrowhead */}
+          <mesh
+            position={[0, 0.2, -holdTailLength - 1.2]}
+            rotation={[Math.PI / 2, 0, 0]}
+            scale={baseScale}
+          >
+            <coneGeometry args={[0.5, 0.8, 3]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={tile.isHolding ? 0.5 : 0.25}
+              metalness={0.1}
+              roughness={0.4}
+              transparent
+              opacity={spawnOpacity * 0.9}
+            />
+          </mesh>
+          {/* Arrowhead glow when holding */}
+          {tile.isHolding && (
+            <mesh
+              position={[0, 0.2, -holdTailLength - 1.2]}
+              rotation={[Math.PI / 2, 0, 0]}
+              scale={baseScale * 1.3}
+            >
+              <coneGeometry args={[0.5, 0.8, 3]} />
+              <meshStandardMaterial
+                color={glowColor}
+                emissive={glowColor}
+                emissiveIntensity={1.2}
+                metalness={0}
+                roughness={0.2}
+                transparent
+                opacity={0.5}
+              />
+            </mesh>
+          )}
+        </>
       )}
 
       {/* Rapid tile dots */}

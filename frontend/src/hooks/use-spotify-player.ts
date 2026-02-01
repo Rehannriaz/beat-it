@@ -356,7 +356,7 @@ export function useSpotifyPlayer() {
           setError('Failed to connect to Spotify player. Make sure you have Spotify Premium.')
         })
 
-        // Update position periodically
+        // Update position periodically - increased frequency for better sync
         positionUpdateIntervalRef.current = setInterval(async () => {
           try {
             const state = await player.getCurrentState()
@@ -370,7 +370,7 @@ export function useSpotifyPlayer() {
           } catch (err: unknown) {
             // Silently fail - state updates come from events
           }
-        }, 100) // Update every 100ms for smooth progress
+        }, 50) // Update every 50ms for better synchronization (reduced from 100ms)
       } catch (err) {
         console.error('Failed to initialize Spotify player:', err)
         setError(err instanceof Error ? err.message : 'Failed to initialize player')
