@@ -9,6 +9,7 @@ import type { SpotifyTrack } from '@/lib/spotify/types'
 import { themeStyles, LANE_KEYS } from '@/lib/game-types'
 import { spotifyApi } from '@/lib/spotify/api'
 import { Play, Pause, RotateCcw, Home, Music, Infinity, Loader2, Upload, Heart, Check, ExternalLink } from 'lucide-react'
+import { DailyChallengeTab } from '@/components/daily-challenge/daily-challenge-tab'
 
 // Custom button component with proper hover effects
 interface GameButtonProps {
@@ -283,6 +284,34 @@ function ThemeButton({ onClick, isActive, theme, children }: ThemeButtonProps) {
   )
 }
 
+interface TabNavProps {
+  activeTab: 'home' | 'daily'
+  onTabChange: (tab: 'home' | 'daily') => void
+  textColor: string
+  glowColor: string
+}
+
+function TabNav({ activeTab, onTabChange, textColor, glowColor }: TabNavProps) {
+  return (
+    <div className="flex gap-2 mb-6">
+      {(['home', 'daily'] as const).map((tab) => (
+        <button
+          key={tab}
+          onClick={() => onTabChange(tab)}
+          className="px-4 py-2 rounded-lg font-medium transition-all text-sm"
+          style={{
+            background: activeTab === tab ? glowColor : 'rgba(255,255,255,0.05)',
+            color: activeTab === tab ? '#000' : textColor,
+            opacity: activeTab === tab ? 1 : 0.6,
+          }}
+        >
+          {tab === 'home' ? 'Home' : 'Daily Challenge'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 interface StartScreen3DProps {
   theme: Theme
   onStart: () => void
@@ -293,6 +322,7 @@ interface StartScreen3DProps {
   onToggleMode?: () => void
   onUploadClick?: () => void
   onSpotifyClick?: () => void
+  onDailyPlay?: (trackId: string) => void
 }
 
 const themes: Theme[] = ['vaporwave', 'retro', 'cyberpunk', 'minimal']
@@ -306,9 +336,11 @@ export function StartScreen3D({
   usePattern = true,
   onToggleMode,
   onUploadClick,
-  onSpotifyClick
+  onSpotifyClick,
+  onDailyPlay
 }: StartScreen3DProps) {
   const styles = themeStyles[theme]
+  const [activeTab, setActiveTab] = useState<'home' | 'daily'>('home')
 
   return (
     <motion.div
@@ -343,163 +375,187 @@ export function StartScreen3D({
         3D Edition
       </motion.p>
 
-      {/* Mode selector */}
-      {onToggleMode && (
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.35 }}
-          className="flex gap-2 sm:gap-3 mb-4 sm:mb-6 px-4"
-        >
-          <ModeButton
-            onClick={onToggleMode}
-            isActive={usePattern}
-            glowColor={styles.glowColor}
-            textColor={styles.textColor}
-          >
-            {patternLoading ? (
-              <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
-            ) : (
-              <Music className="w-3 h-3 sm:w-4 sm:h-4" />
-            )}
-            <span className="text-xs sm:text-sm font-medium">Pattern</span>
-          </ModeButton>
-          <ModeButton
-            onClick={onToggleMode}
-            isActive={!usePattern}
-            glowColor={styles.glowColor}
-            textColor={styles.textColor}
-          >
-            <Infinity className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="text-xs sm:text-sm font-medium">Endless</span>
-          </ModeButton>
-        </motion.div>
-      )}
-
-      {/* Upload and Spotify buttons */}
-      {(onUploadClick || onSpotifyClick) && (
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.37 }}
-          className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4 sm:mb-6 px-4 w-full sm:w-auto"
-        >
-          {onUploadClick && (
-            <HoverButton
-              onClick={onUploadClick}
-              color={styles.laneColors[2]}
-              textColor={styles.textColor}
-            >
-              <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span className="text-sm sm:text-base font-medium">Upload Your Song</span>
-            </HoverButton>
-          )}
-          {onSpotifyClick && (
-            <HoverButton
-              onClick={onSpotifyClick}
-              color="#1DB954"
-              textColor={styles.textColor}
-            >
-              <Music className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: '#1DB954' }} />
-              <span className="text-sm sm:text-base font-medium">Search Spotify</span>
-            </HoverButton>
-          )}
-        </motion.div>
-      )}
-
-      {/* Pattern info */}
-      {usePattern && pattern && (
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.38 }}
-          className="text-center mb-4 sm:mb-6 px-4 sm:px-6 py-2 sm:py-3 rounded-lg mx-4 sm:mx-0 max-w-md"
-          style={{
-            background: 'rgba(255,255,255,0.05)',
-            color: styles.textColor
-          }}
-        >
-          <p className="text-base sm:text-lg font-semibold break-words">{pattern.metadata.songTitle}</p>
-          <p className="text-xs sm:text-sm opacity-60 break-words">
-            {pattern.metadata.artist} • {pattern.metadata.bpm} BPM • {pattern.tiles.length} tiles
-          </p>
-        </motion.div>
-      )}
-
-      {/* Theme selector */}
+      {/* Tab Navigation */}
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 sm:mb-6 md:mb-8 px-4 max-w-2xl"
+        transition={{ delay: 0.35 }}
       >
-        {themes.map((t) => (
-          <ThemeButton
-            key={t}
-            onClick={() => onThemeChange(t)}
-            isActive={t === theme}
-            theme={t}
-          >
-            <span className="text-xs sm:text-sm font-medium">{themeStyles[t].name}</span>
-          </ThemeButton>
-        ))}
-      </motion.div>
-
-      {/* Controls */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="flex gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8 px-4"
-      >
-        {LANE_KEYS.map((key, i) => (
-          <div
-            key={key}
-            className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg flex items-center justify-center border-2"
-            style={{
-              borderColor: styles.laneColors[i],
-              background: `${styles.laneColors[i]}20`,
-              boxShadow: `0 0 15px ${styles.laneColors[i]}40`
-            }}
-          >
-            <span
-              className="text-base sm:text-lg md:text-xl font-bold"
-              style={{ color: styles.laneColors[i] }}
-            >
-              {key}
-            </span>
-          </div>
-        ))}
-      </motion.div>
-
-      <motion.div
-        initial={{ y: 30, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="px-4 w-full sm:w-auto"
-      >
-        <GameButton
-          onClick={onStart}
-          disabled={usePattern && patternLoading}
-          glowColor={styles.glowColor}
+        <TabNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           textColor={styles.textColor}
-          className="text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-4 sm:py-5 md:py-6 w-full sm:w-auto"
-        >
-          {patternLoading && usePattern ? (
-            <>
-              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 animate-spin" />
-              <span className="hidden sm:inline">LOADING...</span>
-              <span className="sm:hidden">LOADING</span>
-            </>
-          ) : (
-            <>
-              <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
-              <span className="hidden sm:inline">START GAME</span>
-              <span className="sm:hidden">START</span>
-            </>
-          )}
-        </GameButton>
+          glowColor={styles.glowColor}
+        />
       </motion.div>
+
+      {activeTab === 'home' ? (
+        <>
+          {/* Mode selector */}
+          {onToggleMode && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.35 }}
+              className="flex gap-2 sm:gap-3 mb-4 sm:mb-6 px-4"
+            >
+              <ModeButton
+                onClick={onToggleMode}
+                isActive={usePattern}
+                glowColor={styles.glowColor}
+                textColor={styles.textColor}
+              >
+                {patternLoading ? (
+                  <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
+                ) : (
+                  <Music className="w-3 h-3 sm:w-4 sm:h-4" />
+                )}
+                <span className="text-xs sm:text-sm font-medium">Pattern</span>
+              </ModeButton>
+              <ModeButton
+                onClick={onToggleMode}
+                isActive={!usePattern}
+                glowColor={styles.glowColor}
+                textColor={styles.textColor}
+              >
+                <Infinity className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm font-medium">Endless</span>
+              </ModeButton>
+            </motion.div>
+          )}
+
+          {/* Upload and Spotify buttons */}
+          {(onUploadClick || onSpotifyClick) && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.37 }}
+              className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4 sm:mb-6 px-4 w-full sm:w-auto"
+            >
+              {onUploadClick && (
+                <HoverButton
+                  onClick={onUploadClick}
+                  color={styles.laneColors[2]}
+                  textColor={styles.textColor}
+                >
+                  <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="text-sm sm:text-base font-medium">Upload Your Song</span>
+                </HoverButton>
+              )}
+              {onSpotifyClick && (
+                <HoverButton
+                  onClick={onSpotifyClick}
+                  color="#1DB954"
+                  textColor={styles.textColor}
+                >
+                  <Music className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: '#1DB954' }} />
+                  <span className="text-sm sm:text-base font-medium">Search Spotify</span>
+                </HoverButton>
+              )}
+            </motion.div>
+          )}
+
+          {/* Pattern info */}
+          {usePattern && pattern && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.38 }}
+              className="text-center mb-4 sm:mb-6 px-4 sm:px-6 py-2 sm:py-3 rounded-lg mx-4 sm:mx-0 max-w-md"
+              style={{
+                background: 'rgba(255,255,255,0.05)',
+                color: styles.textColor
+              }}
+            >
+              <p className="text-base sm:text-lg font-semibold break-words">{pattern.metadata.songTitle}</p>
+              <p className="text-xs sm:text-sm opacity-60 break-words">
+                {pattern.metadata.artist} • {pattern.metadata.bpm} BPM • {pattern.tiles.length} tiles
+              </p>
+            </motion.div>
+          )}
+
+          {/* Theme selector */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.4 }}
+            className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-4 sm:mb-6 md:mb-8 px-4 max-w-2xl"
+          >
+            {themes.map((t) => (
+              <ThemeButton
+                key={t}
+                onClick={() => onThemeChange(t)}
+                isActive={t === theme}
+                theme={t}
+              >
+                <span className="text-xs sm:text-sm font-medium">{themeStyles[t].name}</span>
+              </ThemeButton>
+            ))}
+          </motion.div>
+
+          {/* Controls */}
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="flex gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8 px-4"
+          >
+            {LANE_KEYS.map((key, i) => (
+              <div
+                key={key}
+                className="w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-lg flex items-center justify-center border-2"
+                style={{
+                  borderColor: styles.laneColors[i],
+                  background: `${styles.laneColors[i]}20`,
+                  boxShadow: `0 0 15px ${styles.laneColors[i]}40`
+                }}
+              >
+                <span
+                  className="text-base sm:text-lg md:text-xl font-bold"
+                  style={{ color: styles.laneColors[i] }}
+                >
+                  {key}
+                </span>
+              </div>
+            ))}
+          </motion.div>
+
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="px-4 w-full sm:w-auto"
+          >
+            <GameButton
+              onClick={onStart}
+              disabled={usePattern && patternLoading}
+              glowColor={styles.glowColor}
+              textColor={styles.textColor}
+              className="text-sm sm:text-base md:text-lg px-6 sm:px-8 md:px-10 py-4 sm:py-5 md:py-6 w-full sm:w-auto"
+            >
+              {patternLoading && usePattern ? (
+                <>
+                  <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 animate-spin" />
+                  <span className="hidden sm:inline">LOADING...</span>
+                  <span className="sm:hidden">LOADING</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                  <span className="hidden sm:inline">START GAME</span>
+                  <span className="sm:hidden">START</span>
+                </>
+              )}
+            </GameButton>
+          </motion.div>
+        </>
+      ) : (
+        <DailyChallengeTab
+          theme={theme}
+          onPlay={onDailyPlay || (() => {})}
+          onSpotifyAuth={onSpotifyClick || (() => {})}
+        />
+      )}
     </motion.div>
   )
 }
