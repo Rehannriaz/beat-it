@@ -291,22 +291,79 @@ interface TabNavProps {
   glowColor: string
 }
 
+interface TabButtonProps {
+  onClick: () => void
+  isActive: boolean
+  glowColor: string
+  textColor: string
+  children: React.ReactNode
+}
+
+function TabButton({ onClick, isActive, glowColor, textColor, children }: TabButtonProps) {
+  const buttonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    const button = buttonRef.current
+    if (!button) return
+
+    const handleMouseEnter = () => {
+      if (!isActive) {
+        button.style.background = `${glowColor}30`
+        button.style.opacity = '0.85'
+        button.style.transform = 'scale(1.05)'
+        button.style.boxShadow = `0 0 15px ${glowColor}40`
+      }
+    }
+
+    const handleMouseLeave = () => {
+      if (!isActive) {
+        button.style.background = 'rgba(255,255,255,0.05)'
+        button.style.opacity = '0.6'
+        button.style.transform = 'scale(1)'
+        button.style.boxShadow = 'none'
+      }
+    }
+
+    button.addEventListener('mouseenter', handleMouseEnter)
+    button.addEventListener('mouseleave', handleMouseLeave)
+
+    return () => {
+      button.removeEventListener('mouseenter', handleMouseEnter)
+      button.removeEventListener('mouseleave', handleMouseLeave)
+    }
+  }, [isActive, glowColor])
+
+  return (
+    <button
+      ref={buttonRef}
+      onClick={onClick}
+      className="px-4 py-2 rounded-lg font-medium transition-all text-sm cursor-pointer pointer-events-auto"
+      style={{
+        background: isActive ? glowColor : 'rgba(255,255,255,0.05)',
+        color: isActive ? '#000' : textColor,
+        opacity: isActive ? 1 : 0.6,
+        transform: isActive ? 'scale(1.05)' : 'scale(1)',
+        boxShadow: isActive ? `0 0 15px ${glowColor}50` : 'none',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 function TabNav({ activeTab, onTabChange, textColor, glowColor }: TabNavProps) {
   return (
     <div className="flex gap-2 mb-6">
       {(['home', 'daily'] as const).map((tab) => (
-        <button
+        <TabButton
           key={tab}
           onClick={() => onTabChange(tab)}
-          className="px-4 py-2 rounded-lg font-medium transition-all text-sm"
-          style={{
-            background: activeTab === tab ? glowColor : 'rgba(255,255,255,0.05)',
-            color: activeTab === tab ? '#000' : textColor,
-            opacity: activeTab === tab ? 1 : 0.6,
-          }}
+          isActive={activeTab === tab}
+          glowColor={glowColor}
+          textColor={textColor}
         >
           {tab === 'home' ? 'Home' : 'Daily Challenge'}
-        </button>
+        </TabButton>
       ))}
     </div>
   )
