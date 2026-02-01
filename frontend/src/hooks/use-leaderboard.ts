@@ -54,6 +54,7 @@ export function useLeaderboard(challengeDate: string) {
       }))
     },
     refetchInterval: 30000, // Refresh every 30 seconds
+    enabled: !!challengeDate, // Don't run query if date is empty
   })
 }
 
@@ -77,7 +78,7 @@ export function useUserBestScore(challengeDate: string) {
       if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows
       return data
     },
-    enabled: !!user,
+    enabled: !!user && !!challengeDate, // Don't run query if date is empty
   })
 }
 
