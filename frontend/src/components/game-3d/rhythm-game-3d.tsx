@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, Suspense, useRef, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import dynamic from 'next/dynamic'
-import { useGame3D, useExamplePattern } from '@/hooks'
+import { useGame3D, useExamplePattern, useGameSounds } from '@/hooks'
 import { HUD3D } from './hud-3d'
 import { StartScreen3D, PauseScreen3D, GameOverScreen3D } from './overlays-3d'
+import { ComboCelebration } from './combo-celebration'
 import { UploadWizard } from '@/components/upload-wizard'
 import { SpotifyWizard } from '@/components/spotify-wizard'
 import { SpotifyPlayer } from '@/components/spotify/spotify-player'
@@ -51,6 +52,9 @@ export function RhythmGame3D() {
   const [spotifyPattern, setSpotifyPattern] = useState<GamePattern | null>(null)
   const [spotifyPosition, setSpotifyPosition] = useState(0)
 
+  const { playHit, playComboMilestone, checkMilestone } = useGameSounds()
+  const prevComboRef = useRef(0)
+
   const { data: examplePattern, isLoading: patternLoading } = useExamplePattern()
 
   // Use spotify pattern, uploaded pattern, or example pattern (in priority order)
@@ -74,6 +78,22 @@ export function RhythmGame3D() {
     spotifyPosition: spotifyTrack ? spotifyPosition : undefined,
   })
 
+  // Play sounds on hit feedback
+  useEffect(() => {
+    if (gameState.lastHitFeedback) {
+      playHit(gameState.lastHitFeedback.type)
+    }
+  }, [gameState.lastHitFeedback, playHit])
+
+  // Track combo for milestone detection
+  useEffect(() => {
+    const prevCombo = prevComboRef.current
+    prevComboRef.current = gameState.combo
+
+    if (checkMilestone(prevCombo, gameState.combo)) {
+      playComboMilestone()
+    }
+  }, [gameState.combo, checkMilestone, playComboMilestone])
 
   const handleUploadComplete = (song: Song) => {
     setUploadedSong(song)
@@ -194,6 +214,14 @@ export function RhythmGame3D() {
             shouldReset={gameState.isPlaying}
           />
         </div>
+      )}
+
+      {/* Combo celebrations */}
+      {gameState.isPlaying && !gameState.isPaused && (
+        <ComboCelebration
+          combo={gameState.combo}
+          theme={theme}
+        />
       )}
 
       {/* Overlays */}

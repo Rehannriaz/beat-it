@@ -10,6 +10,7 @@ import type { GameState3D } from '@/hooks/use-game-3d'
 import { Road } from './road'
 import { Tile3DComponent } from './tile-3d'
 import { HitEffect } from './hit-effect'
+import { ScorePopups } from './score-popups'
 import { LANE_KEYS } from '@/lib/game-types'
 
 interface Scene3DProps {
@@ -18,6 +19,7 @@ interface Scene3DProps {
   onTileHit?: (lane: number) => void
   speed?: number
   pressedKeys?: Set<number>
+  combo?: number
 }
 
 const themeBackgrounds: Record<Theme, string> = {
@@ -261,7 +263,7 @@ function ResponsiveCamera() {
   return null
 }
 
-function SceneContent({ gameState, theme, onTileHit, speed = 15, pressedKeys = new Set() }: Scene3DProps) {
+function SceneContent({ gameState, theme, onTileHit, speed = 15, pressedKeys = new Set(), combo = 0 }: Scene3DProps) {
   const colors = themeColors[theme]
   const { scene } = useThree()
 
@@ -346,6 +348,12 @@ function SceneContent({ gameState, theme, onTileHit, speed = 15, pressedKeys = n
           time={gameState.lastHitFeedback.time}
         />
       )}
+
+      {/* Score popups */}
+      <ScorePopups
+        lastHitFeedback={gameState.lastHitFeedback}
+        combo={combo}
+      />
     </>
   )
 }
@@ -423,7 +431,7 @@ export function Scene3D({ gameState, theme, onTileHit, speed = 15, pressedKeys =
       }}
       dpr={[1, 2]}
     >
-      <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} speed={speed} pressedKeys={pressedKeys} />
+      <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} speed={speed} pressedKeys={pressedKeys} combo={gameState.combo} />
     </Canvas>
   )
 }

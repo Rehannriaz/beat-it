@@ -6,3 +6,4 @@ export * from './use-game-3d';
 export * from './use-leaderboard';
 export * from './useSongs';
 export * from './useSpotifyPattern';
+export * from './use-game-sounds';
