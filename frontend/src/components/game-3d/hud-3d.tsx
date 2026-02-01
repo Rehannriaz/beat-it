@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pause } from 'lucide-react'
 import type { Theme } from '@/lib/game-types'
@@ -50,6 +50,34 @@ function getComboText(combo: number): string | null {
 export function HUD3D({ gameState, theme, onPause }: HUD3DProps) {
   const styles = themeStyles[theme]
   const comboText = getComboText(gameState.combo)
+
+  // Track visible states for auto-hiding feedback
+  const [visibleComboText, setVisibleComboText] = useState<string | null>(null)
+  const [visibleHitFeedback, setVisibleHitFeedback] = useState<typeof gameState.lastHitFeedback>(null)
+
+  // Auto-hide combo text after 2 seconds
+  useEffect(() => {
+    if (comboText) {
+      setVisibleComboText(comboText)
+      const timer = setTimeout(() => {
+        setVisibleComboText(null)
+      }, 2000)
+      return () => clearTimeout(timer)
+    } else {
+      setVisibleComboText(null)
+    }
+  }, [comboText, gameState.combo]) // Reset timer when combo changes
+
+  // Auto-hide hit feedback after 2 seconds
+  useEffect(() => {
+    if (gameState.lastHitFeedback) {
+      setVisibleHitFeedback(gameState.lastHitFeedback)
+      const timer = setTimeout(() => {
+        setVisibleHitFeedback(null)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [gameState.lastHitFeedback?.time]) // Reset timer on each new hit
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
@@ -110,11 +138,11 @@ export function HUD3D({ gameState, theme, onPause }: HUD3DProps) {
         </AnimatePresence>
       </motion.div>
 
-      {/* Combo text feedback - smaller on mobile */}
+      {/* Combo text feedback - smaller on mobile, auto-hides after 2s */}
       <AnimatePresence>
-        {comboText && (
+        {visibleComboText && (
           <motion.div
-            key={comboText}
+            key={`${visibleComboText}-${gameState.combo}`}
             initial={{ scale: 0.5, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 1.5, opacity: 0, y: -20 }}
@@ -128,7 +156,7 @@ export function HUD3D({ gameState, theme, onPause }: HUD3DProps) {
                 textShadow: `0 0 30px ${styles.laneColors[gameState.combo % 4]}, 0 0 60px ${styles.laneColors[gameState.combo % 4]}`
               }}
             >
-              {comboText}
+              {visibleComboText}
             </p>
           </motion.div>
         )}

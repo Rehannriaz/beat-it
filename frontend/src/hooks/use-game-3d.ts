@@ -32,7 +32,7 @@ export interface GameState3D {
   isPaused: boolean
   gameOver: boolean
   gameTime: number
-  lastHitFeedback: { lane: number; type: 'perfect' | 'good' | 'miss'; time: number } | null
+  lastHitFeedback: { lane: number; type: 'perfect' | 'good' | 'miss'; time: number; score?: number } | null
   // Accuracy tracking
   perfectHits: number
   goodHits: number
@@ -141,6 +141,9 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   const endlessSpawnTimerRef = useRef<number>(0)
   const endlessTileIdRef = useRef<number>(0)
 
+  // Track max game time reached to handle Spotify position resets at song end
+  const maxGameTimeReachedRef = useRef<number>(0)
+
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const spotifyPositionRef = useRef(spotifyPosition)
@@ -235,16 +238,17 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         // Score per tap for rapid tiles
         const tapScore = 30 * (Math.floor(prev.combo / 10) + 1)
         const bonusOnComplete = isComplete ? 100 : 0
+        const rapidScoreIncrease = tapScore + bonusOnComplete
 
         return {
           ...prev,
           tiles: newTiles,
-          score: prev.score + tapScore + bonusOnComplete,
+          score: prev.score + rapidScoreIncrease,
           combo: isComplete ? prev.combo + 1 : prev.combo,
           maxCombo: isComplete ? Math.max(prev.maxCombo, prev.combo + 1) : prev.maxCombo,
           perfectHits: isComplete && hitType === 'perfect' ? prev.perfectHits + 1 : prev.perfectHits,
           goodHits: isComplete && hitType === 'good' ? prev.goodHits + 1 : prev.goodHits,
-          lastHitFeedback: { lane, type: isComplete ? hitType : 'good', time: Date.now() }
+          lastHitFeedback: { lane, type: isComplete ? hitType : 'good', time: Date.now(), score: rapidScoreIncrease }
         }
       }
 
@@ -282,7 +286,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         maxCombo: Math.max(prev.maxCombo, newCombo),
         perfectHits: hitType === 'perfect' ? prev.perfectHits + 1 : prev.perfectHits,
         goodHits: hitType === 'good' ? prev.goodHits + 1 : prev.goodHits,
-        lastHitFeedback: { lane, type: hitType, time: Date.now() }
+        lastHitFeedback: { lane, type: hitType, time: Date.now(), score: scoreIncrease }
       }
     })
   }, [hitTolerance, hitZoneZ])
@@ -319,7 +323,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           combo: prev.combo + 1,
           maxCombo: Math.max(prev.maxCombo, prev.combo + 1),
           perfectHits: prev.perfectHits + 1,
-          lastHitFeedback: { lane, type: 'perfect', time: Date.now() }
+          lastHitFeedback: { lane, type: 'perfect', time: Date.now(), score: scoreIncrease }
         }
       } else {
         // Released too early
@@ -344,6 +348,8 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     pressedKeysRef.current = new Set()
     // Reset Spotify sync flag - important: don't sync until position is actually 0
     spotifySyncedRef.current = false
+    // Reset max game time tracker
+    maxGameTimeReachedRef.current = 0
 
     const currentPattern = patternRef.current
     const isUsingSpotify = spotifyPositionRef.current !== undefined
@@ -484,6 +490,11 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         } else {
           // No audio - increment normally
           newGameTime = prev.gameTime + deltaTime
+        }
+
+        // Track max game time reached (handles Spotify position resets at song end)
+        if (newGameTime > maxGameTimeReachedRef.current) {
+          maxGameTimeReachedRef.current = newGameTime
         }
 
         // Handle audio playback start (only for local audio files)
@@ -672,7 +683,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           newCombo += 1
           newMaxCombo = Math.max(newMaxCombo, newCombo)
           newPerfectHits += 1
-          lastHitFeedback = { lane: holdTile.lane, type: 'perfect', time: Date.now() }
+          lastHitFeedback = { lane: holdTile.lane, type: 'perfect', time: Date.now(), score: scoreIncrease }
         }
 
         if (newlyMissed.length > 0) {
@@ -685,9 +696,12 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           const noActiveTiles = updatedTiles.length === 0
           const minGameTime = 3
 
-          if (allSpawned && noActiveTiles && newGameTime > minGameTime) {
+          // Use maxGameTimeReachedRef to handle Spotify position resets at song end
+          // When Spotify track ends, position may reset to 0, but we remember the max time reached
+          if (allSpawned && noActiveTiles && maxGameTimeReachedRef.current > minGameTime) {
             console.log('[Game] Game Over', {
               gameTime: newGameTime.toFixed(2),
+              maxGameTimeReached: maxGameTimeReachedRef.current.toFixed(2),
               spawned: spawnedTilesRef.current.size
             })
             if (audioRef.current) {

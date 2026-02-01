@@ -5,7 +5,7 @@ import { useThree } from '@react-three/fiber'
 import { ScorePopup, ScorePopupData } from './score-popup'
 
 interface ScorePopupsProps {
-  lastHitFeedback: { lane: number; type: 'perfect' | 'good' | 'miss'; time: number } | null
+  lastHitFeedback: { lane: number; type: 'perfect' | 'good' | 'miss'; time: number; score?: number } | null
   combo: number
 }
 
@@ -37,20 +37,15 @@ export function ScorePopups({ lastHitFeedback, combo }: ScorePopupsProps) {
   useEffect(() => {
     if (!lastHitFeedback) return
 
-    const { lane, type, time } = lastHitFeedback
+    const { lane, type, time, score } = lastHitFeedback
 
-    // Calculate score based on hit type
-    let score = 0
-    if (type === 'perfect') score = 150
-    else if (type === 'good') score = 100
-
-    // Calculate multiplier from combo
+    // Calculate multiplier from combo (for display purposes)
     const multiplier = Math.floor(combo / 10) + 1
 
     const newPopup: ScorePopupData = {
       id: `popup-${time}-${lane}`,
       lane,
-      score: score * multiplier,
+      score: score ?? 0,
       type,
       multiplier,
       spawnTime: time,
