@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Pause } from 'lucide-react'
 import type { Theme } from '@/lib/game-types'
 import type { GameState3D } from '@/hooks/use-game-3d'
 import { themeStyles } from '@/lib/game-types'
@@ -8,6 +10,33 @@ import { themeStyles } from '@/lib/game-types'
 interface HUD3DProps {
   gameState: GameState3D
   theme: Theme
+  onPause?: () => void
+}
+
+// Pause button with hover effect
+function PauseButton({ onClick, glowColor, textColor }: { onClick: () => void; glowColor: string; textColor: string }) {
+  const [isHovered, setIsHovered] = useState(false)
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 pointer-events-auto
+                 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center
+                 transition-all duration-200 cursor-pointer"
+      style={{
+        background: isHovered ? `${glowColor}60` : `${glowColor}30`,
+        border: `2px solid ${glowColor}`,
+        boxShadow: isHovered ? `0 0 30px ${glowColor}` : `0 0 15px ${glowColor}40`,
+        transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+      }}
+    >
+      <Pause className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
+    </motion.button>
+  )
 }
 
 function getComboText(combo: number): string | null {
@@ -18,12 +47,17 @@ function getComboText(combo: number): string | null {
   return null
 }
 
-export function HUD3D({ gameState, theme }: HUD3DProps) {
+export function HUD3D({ gameState, theme, onPause }: HUD3DProps) {
   const styles = themeStyles[theme]
   const comboText = getComboText(gameState.combo)
 
   return (
     <div className="absolute inset-0 pointer-events-none z-10">
+      {/* Pause button - top center */}
+      {onPause && (
+        <PauseButton onClick={onPause} glowColor={styles.glowColor} textColor={styles.textColor} />
+      )}
+
       {/* Score - compact on mobile to save space */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

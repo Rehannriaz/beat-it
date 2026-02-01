@@ -90,7 +90,7 @@ export function RhythmGame3D() {
 
       {/* HUD - only show when playing */}
       {gameState.isPlaying && !gameState.isPaused && (
-        <HUD3D gameState={gameState} theme={theme} />
+        <HUD3D gameState={gameState} theme={theme} onPause={pauseGame} />
       )}
 
       {/* Upload Wizard */}
@@ -151,6 +151,7 @@ export function RhythmGame3D() {
             gameState={gameState}
             theme={theme}
             onRestart={startGame}
+            onMenu={endGame}
           />
         )}
       </AnimatePresence>

@@ -210,7 +210,21 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       audioRef.current.pause()
       audioRef.current.currentTime = 0
     }
-    setGameState(prev => ({ ...prev, isPlaying: false, gameOver: true }))
+    // Reset game state completely to return to menu
+    setGameState({
+      tiles: [],
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      isPlaying: false,
+      isPaused: false,
+      gameOver: false,
+      gameTime: 0,
+      lastHitFeedback: null
+    })
+    spawnedTilesRef.current = new Set()
+    endlessTileIdRef.current = 0
+    endlessSpawnTimerRef.current = 0
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current)
     }
