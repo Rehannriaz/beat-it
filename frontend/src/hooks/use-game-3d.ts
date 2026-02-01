@@ -640,7 +640,18 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           })
           .map(tile => {
             // Mark as missed if tile has passed the hit zone
-            if (!tile.hit && !tile.missed && tile.z > currentHitZoneZ + currentHitTolerance + 2) {
+            // For hold tiles, check when the TAIL has passed, not just the head
+            const missThreshold = currentHitZoneZ + currentHitTolerance + 2
+            let tilePastHitZone = tile.z > missThreshold
+
+            // Hold tiles: use tail end position instead of head
+            if (tile.type === 'hold' && tile.holdDuration) {
+              const tailLength = tile.holdDuration * currentSpeed
+              const tailEndZ = tile.z - tailLength
+              tilePastHitZone = tailEndZ > missThreshold
+            }
+
+            if (!tile.hit && !tile.missed && tilePastHitZone) {
               // Hold tiles: check if hold was completed
               if (tile.type === 'hold' && (tile.holdProgress ?? 0) >= 0.8) {
                 // Track this tile for scoring
@@ -658,7 +669,16 @@ export function useGame3D(options: UseGame3DOptions = {}) {
             }
             return tile
           })
-          .filter(tile => tile.z < 15)
+          .filter(tile => {
+            // For hold tiles, account for the tail length before removing
+            // The tail extends backward (negative Z) from the head position
+            if (tile.type === 'hold' && tile.holdDuration) {
+              const tailLength = tile.holdDuration * currentSpeed
+              // Remove when the tail end has also passed the screen (z > 15)
+              return tile.z - tailLength < 15
+            }
+            return tile.z < 15
+          })
 
         const newlyMissed = updatedTiles.filter(
           tile => tile.missed && !prev.tiles.find(t => t.id === tile.id)?.missed
