@@ -56,6 +56,7 @@ export function RhythmGame3D() {
   const [isDailyChallenge, setIsDailyChallenge] = useState(false)
   const [dailyTrackId, setDailyTrackId] = useState<string | null>(null)
   const [showScoreSubmit, setShowScoreSubmit] = useState(false)
+  const [dailyError, setDailyError] = useState<string | null>(null)
 
   const { playHit, playComboMilestone, checkMilestone } = useGameSounds()
   const prevComboRef = useRef(0)
@@ -121,56 +122,65 @@ export function RhythmGame3D() {
   }
 
   const handleDailyPlay = async (trackId: string) => {
-    setIsDailyChallenge(true)
-    setDailyTrackId(trackId)
-
-    // Fetch the track from Spotify
-    const { spotifyApi } = await import('@/lib/spotify/api')
-    const track = await spotifyApi.getTrack(trackId)
-
-    // Generate pattern for this track using the same logic as useSpotifyPattern
-    const { transformSpotifyAnalysis, generateFeaturesFromTrack } = await import('@/lib/spotify/transform')
-    const { api } = await import('@/lib/api')
-
-    let features
     try {
-      const analysis = await spotifyApi.getAudioAnalysis(trackId)
-      features = transformSpotifyAnalysis(analysis)
-    } catch {
-      // Audio Analysis API may be deprecated - fallback to basic features
-      let audioFeatures = null
+      setDailyError(null)  // Clear any previous error
+      setIsDailyChallenge(true)
+      setDailyTrackId(trackId)
+
+      // Fetch the track from Spotify
+      const { spotifyApi } = await import('@/lib/spotify/api')
+      const track = await spotifyApi.getTrack(trackId)
+
+      // Generate pattern for this track using the same logic as useSpotifyPattern
+      const { transformSpotifyAnalysis, generateFeaturesFromTrack } = await import('@/lib/spotify/transform')
+      const { api } = await import('@/lib/api')
+
+      let features
       try {
-        audioFeatures = await spotifyApi.getAudioFeatures(trackId)
+        const analysis = await spotifyApi.getAudioAnalysis(trackId)
+        features = transformSpotifyAnalysis(analysis)
       } catch {
-        // Audio Features also unavailable, will use default tempo
+        // Audio Analysis API may be deprecated - fallback to basic features
+        let audioFeatures = null
+        try {
+          audioFeatures = await spotifyApi.getAudioFeatures(trackId)
+        } catch {
+          // Audio Features also unavailable, will use default tempo
+        }
+        features = generateFeaturesFromTrack(track.duration_ms, audioFeatures)
       }
-      features = generateFeaturesFromTrack(track.duration_ms, audioFeatures)
+
+      // Call backend to generate pattern
+      const response = await api.post<{ data: GamePattern }>(
+        '/spotify/generate-pattern',
+        {
+          trackId: track.id,
+          title: track.name,
+          artist: track.artists.map((a) => a.name).join(', '),
+          duration: track.duration_ms / 1000,
+          difficulty: 'medium',
+          features,
+        }
+      )
+      const pattern = response.data
+
+      // Set up like handleSpotifyComplete but for daily
+      setSpotifyPosition(0)
+      setSpotifyTrack(track)
+      setSpotifyPattern(pattern)
+      setUploadedPattern(null)
+      setUploadedSong(null)
+      setUsePattern(true)
+
+      // Start the game
+      startGame()
+    } catch (error) {
+      console.error('Failed to start daily challenge:', error)
+      setDailyError(error instanceof Error ? error.message : 'Failed to start daily challenge')
+      // Reset state on error
+      setIsDailyChallenge(false)
+      setDailyTrackId(null)
     }
-
-    // Call backend to generate pattern
-    const response = await api.post<{ data: GamePattern }>(
-      '/spotify/generate-pattern',
-      {
-        trackId: track.id,
-        title: track.name,
-        artist: track.artists.map((a) => a.name).join(', '),
-        duration: track.duration_ms / 1000,
-        difficulty: 'medium',
-        features,
-      }
-    )
-    const pattern = response.data
-
-    // Set up like handleSpotifyComplete but for daily
-    setSpotifyPosition(0)
-    setSpotifyTrack(track)
-    setSpotifyPattern(pattern)
-    setUploadedPattern(null)
-    setUploadedSong(null)
-    setUsePattern(true)
-
-    // Start the game
-    startGame()
   }
 
   // Show score submit modal when daily challenge ends
