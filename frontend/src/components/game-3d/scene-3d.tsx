@@ -16,6 +16,7 @@ interface Scene3DProps {
   gameState: GameState3D
   theme: Theme
   onTileHit?: (lane: number) => void
+  speed?: number
 }
 
 const themeBackgrounds: Record<Theme, string> = {
@@ -258,21 +259,15 @@ function ResponsiveCamera() {
   return null
 }
 
-function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
+function SceneContent({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps) {
   const colors = themeColors[theme]
   const { scene } = useThree()
 
-  // Add fog effect to hide tile spawning in the distance
+  // Add fog effect for gradual fade in the distance
   useEffect(() => {
-    // Using linear fog for better control
-    // near: where fog starts (closer to camera = more visible fog)
-    // far: where fog is completely opaque (hides spawn point at -70)
-    // Tiles spawn at Z = -70, so fog should be fully opaque before that
-    const fog = new THREE.Fog(
-      themeBackgrounds[theme],
-      -30,  // Fog starts becoming visible at -30
-      -65   // Fog is completely opaque at -65 (just before spawn at -70)
-    )
+    // Using exponential fog for smoother, more gradual fade
+    // density controls how quickly it fades - lower = more gradual
+    const fog = new THREE.FogExp2(themeBackgrounds[theme], 0.018)
     scene.fog = fog
 
     return () => {
@@ -320,8 +315,14 @@ function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
       {/* Floating particles */}
       <FloatingParticles theme={theme} />
       
-      {/* Road/corridor - memoized */}
-      {useMemo(() => <Road theme={theme} />, [theme])}
+      {/* Road/corridor - moves like a treadmill */}
+      {useMemo(() => (
+        <Road
+          theme={theme}
+          speed={speed}
+          isPlaying={gameState.isPlaying && !gameState.isPaused}
+        />
+      ), [theme, speed, gameState.isPlaying, gameState.isPaused])}
       
       {/* Lane key labels */}
       <LaneKeyLabels theme={theme} />
@@ -335,21 +336,18 @@ function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
       
       {/* Hit effects */}
       {gameState.lastHitFeedback && (
-        <HitEffect 
+        <HitEffect
           lane={gameState.lastHitFeedback.lane}
           type={gameState.lastHitFeedback.type}
           theme={theme}
           time={gameState.lastHitFeedback.time}
         />
       )}
-      
-      {/* Fog for depth - extended to see tiles at z=-70 */}
-      <fog attach="fog" args={[themeBackgrounds[theme], 60, 120]} />
     </>
   )
 }
 
-export function Scene3D({ gameState, theme, onTileHit }: Scene3DProps) {
+export function Scene3D({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps) {
   // Calculate initial camera settings based on viewport
   const [cameraSettings, setCameraSettings] = useState({
     fov: 65,
@@ -422,7 +420,7 @@ export function Scene3D({ gameState, theme, onTileHit }: Scene3DProps) {
       }}
       dpr={[1, 2]}
     >
-      <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} />
+      <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} speed={speed} />
     </Canvas>
   )
 }

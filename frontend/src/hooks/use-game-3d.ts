@@ -226,26 +226,26 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       setGameState(prev => {
         let newGameTime = prev.gameTime + deltaTime
 
-        // Use Spotify position when provided, otherwise use audio element
-        const currentSpotifyPosition = spotifyPositionRef.current
-        if (currentSpotifyPosition !== undefined && newGameTime >= 0) {
-          // Spotify mode: sync to Spotify position (already in seconds)
-          const spotifyTime = currentSpotifyPosition
-          if (Math.abs(spotifyTime - newGameTime) > 0.1) {
-            newGameTime = spotifyTime
-          }
-        } else if (audioRef.current) {
-          // Audio element mode: existing logic for uploaded songs
+        // Handle audio playback start
+        if (audioRef.current) {
           if (prev.gameTime < 0 && newGameTime >= 0) {
             audioRef.current.currentTime = 0
             audioRef.current.play().catch(console.error)
           }
+        }
 
-          if (!audioRef.current.paused && newGameTime >= 0) {
-            const audioTime = audioRef.current.currentTime
-            if (Math.abs(audioTime - newGameTime) > 0.1) {
-              newGameTime = audioTime
-            }
+        // Sync to audio/Spotify only occasionally to avoid jitter
+        // Only hard-sync when severely out of sync (> 1 second)
+        const currentSpotifyPosition = spotifyPositionRef.current
+        if (currentSpotifyPosition !== undefined && newGameTime >= 0) {
+          const drift = Math.abs(currentSpotifyPosition - newGameTime)
+          if (drift > 1.0) {
+            newGameTime = currentSpotifyPosition
+          }
+        } else if (audioRef.current && !audioRef.current.paused && newGameTime >= 0) {
+          const drift = Math.abs(audioRef.current.currentTime - newGameTime)
+          if (drift > 1.0) {
+            newGameTime = audioRef.current.currentTime
           }
         }
 
@@ -412,6 +412,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     hitTile,
     pattern,
     mode,
-    audioRef
+    audioRef,
+    speed
   }
 }
