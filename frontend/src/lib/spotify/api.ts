@@ -126,4 +126,72 @@ export const spotifyApi = {
     });
     return spotifyRequest<{ items: Array<{ track: SpotifyTrack }> }>(`/playlists/${playlistId}/tracks?${params.toString()}`);
   },
+
+  /**
+   * Check if tracks are saved in user's library
+   */
+  checkSavedTracks: (trackIds: string[]) => {
+    const params = new URLSearchParams({
+      ids: trackIds.join(','),
+    });
+    return spotifyRequest<boolean[]>(`/me/tracks/contains?${params.toString()}`);
+  },
+
+  /**
+   * Save tracks to user's library
+   */
+  saveTrack: async (trackId: string): Promise<void> => {
+    const token = getStoredAccessToken();
+
+    if (!token) {
+      throw new Error('No access token available. Please log in.');
+    }
+
+    const response = await fetch(`${SPOTIFY_API_BASE}/me/tracks`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ids: [trackId] }),
+    });
+
+    if (response.status === 401) {
+      clearTokens();
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to save track: ${response.status}`);
+    }
+  },
+
+  /**
+   * Remove tracks from user's library
+   */
+  removeTrack: async (trackId: string): Promise<void> => {
+    const token = getStoredAccessToken();
+
+    if (!token) {
+      throw new Error('No access token available. Please log in.');
+    }
+
+    const response = await fetch(`${SPOTIFY_API_BASE}/me/tracks`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ids: [trackId] }),
+    });
+
+    if (response.status === 401) {
+      clearTokens();
+      throw new Error('Session expired. Please log in again.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to remove track: ${response.status}`);
+    }
+  },
 };

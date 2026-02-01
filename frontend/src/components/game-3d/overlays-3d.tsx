@@ -1,12 +1,14 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { Theme } from '@/lib/game-types'
 import type { GameState3D } from '@/hooks/use-game-3d'
 import type { GamePattern } from '@/lib/pattern-types'
+import type { SpotifyTrack } from '@/lib/spotify/types'
 import { themeStyles, LANE_KEYS } from '@/lib/game-types'
-import { Play, Pause, RotateCcw, Home, Music, Infinity, Loader2, Upload } from 'lucide-react'
+import { spotifyApi } from '@/lib/spotify/api'
+import { Play, Pause, RotateCcw, Home, Music, Infinity, Loader2, Upload, Heart, Check, ExternalLink } from 'lucide-react'
 
 // Custom button component with proper hover effects
 interface GameButtonProps {
@@ -570,10 +572,55 @@ interface GameOverScreen3DProps {
   theme: Theme
   onRestart: () => void
   onMenu?: () => void
+  spotifyTrack?: SpotifyTrack | null
 }
 
-export function GameOverScreen3D({ gameState, theme, onRestart, onMenu }: GameOverScreen3DProps) {
+export function GameOverScreen3D({ gameState, theme, onRestart, onMenu, spotifyTrack }: GameOverScreen3DProps) {
   const styles = themeStyles[theme]
+  const [isSaved, setIsSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isChecking, setIsChecking] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Check if track is already saved when component mounts
+  useEffect(() => {
+    if (!spotifyTrack) return
+
+    const checkSaved = async () => {
+      setIsChecking(true)
+      try {
+        const [saved] = await spotifyApi.checkSavedTracks([spotifyTrack.id])
+        setIsSaved(saved)
+      } catch {
+        // Silently fail - user might not have proper scopes
+      } finally {
+        setIsChecking(false)
+      }
+    }
+
+    checkSaved()
+  }, [spotifyTrack])
+
+  const handleSaveTrack = async () => {
+    if (!spotifyTrack || isSaving) return
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      if (isSaved) {
+        await spotifyApi.removeTrack(spotifyTrack.id)
+        setIsSaved(false)
+      } else {
+        await spotifyApi.saveTrack(spotifyTrack.id)
+        setIsSaved(true)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update library')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <motion.div
@@ -587,7 +634,7 @@ export function GameOverScreen3D({ gameState, theme, onRestart, onMenu }: GameOv
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.8, opacity: 0 }}
-        className="text-center"
+        className="text-center max-w-md w-full"
       >
         <h2
           className={`text-3xl sm:text-4xl md:text-5xl font-bold mb-6 sm:mb-8 px-4 ${styles.font}`}
@@ -633,6 +680,96 @@ export function GameOverScreen3D({ gameState, theme, onRestart, onMenu }: GameOv
             </p>
           </div>
         </div>
+
+        {/* Spotify Track Card */}
+        {spotifyTrack && (
+          <motion.div
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="mx-4 mb-6 p-4 rounded-xl"
+            style={{
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${styles.glowColor}40`,
+            }}
+          >
+            <div className="flex items-center gap-4">
+              {/* Album Art */}
+              {spotifyTrack.album.images[0] && (
+                <img
+                  src={spotifyTrack.album.images[0].url}
+                  alt={spotifyTrack.album.name}
+                  className="w-16 h-16 rounded-lg shadow-lg flex-shrink-0"
+                />
+              )}
+
+              {/* Track Info */}
+              <div className="flex-1 text-left min-w-0">
+                <p
+                  className="font-semibold truncate"
+                  style={{ color: styles.textColor }}
+                >
+                  {spotifyTrack.name}
+                </p>
+                <p
+                  className="text-sm opacity-70 truncate"
+                  style={{ color: styles.textColor }}
+                >
+                  {spotifyTrack.artists.map(a => a.name).join(', ')}
+                </p>
+              </div>
+
+              {/* Save Button */}
+              <button
+                onClick={handleSaveTrack}
+                disabled={isSaving || isChecking}
+                className="flex-shrink-0 p-3 rounded-full transition-all duration-200 cursor-pointer pointer-events-auto disabled:opacity-50"
+                style={{
+                  background: isSaved ? '#1DB954' : 'rgba(255,255,255,0.1)',
+                  color: isSaved ? '#000' : styles.textColor,
+                }}
+                title={isSaved ? 'Remove from Library' : 'Add to Library'}
+              >
+                {isSaving || isChecking ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : isSaved ? (
+                  <Check className="w-5 h-5" />
+                ) : (
+                  <Heart className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+
+            {/* Success/Error Message */}
+            {isSaved && !isSaving && (
+              <motion.p
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm mt-3 text-center"
+                style={{ color: '#1DB954' }}
+              >
+                Added to your Spotify Library!
+              </motion.p>
+            )}
+            {error && (
+              <p className="text-sm mt-3 text-center text-red-400">
+                {error}
+              </p>
+            )}
+
+            {/* Open in Spotify Link */}
+            <a
+              href={spotifyTrack.external_urls.spotify}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 mt-3 text-sm opacity-60 hover:opacity-100 transition-opacity pointer-events-auto"
+              style={{ color: styles.textColor }}
+            >
+              <ExternalLink className="w-4 h-4" />
+              Open in Spotify
+            </a>
+          </motion.div>
+        )}
 
         <div className="flex flex-col gap-3 sm:gap-4 px-4">
           <GameButton
