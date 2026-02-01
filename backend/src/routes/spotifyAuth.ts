@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { AppError } from '../utils/AppError';
 
 const router = Router();
@@ -30,13 +30,13 @@ const REDIRECT_URI = process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:3001/
  *       302:
  *         description: Redirects to frontend with code or error
  */
-router.get('/callback', async (req: Request, res: Response) => {
+router.get('/callback', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { code, error, state } = req.query;
 
     // Frontend URL - adjust this to match your frontend URL
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    
+
     // Use state parameter to preserve the original page, or default to /spotify-test
     const redirectPath = state ? decodeURIComponent(state as string) : '/spotify-test';
     const redirectUrl = new URL(redirectPath, frontendUrl);
@@ -60,7 +60,7 @@ router.get('/callback', async (req: Request, res: Response) => {
     // No code or error, redirect to spotify-test page
     return res.redirect(new URL('/spotify-test', frontendUrl).toString());
   } catch (err) {
-    throw new AppError('Callback handling failed', 500);
+    next(new AppError('Callback handling failed', 500));
   }
 });
 
@@ -92,16 +92,16 @@ router.get('/callback', async (req: Request, res: Response) => {
  *       500:
  *         description: Server error
  */
-router.post('/auth/spotify/token', async (req: Request, res: Response) => {
+router.post('/auth/spotify/token', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { code } = req.body;
 
     if (!code) {
-      throw new AppError('Authorization code is required', 400);
+      return next(new AppError('Authorization code is required', 400));
     }
 
     if (!CLIENT_ID || !CLIENT_SECRET) {
-      throw new AppError('Spotify credentials not configured', 500);
+      return next(new AppError('Spotify credentials not configured', 500));
     }
 
     // Exchange code for tokens
@@ -120,7 +120,7 @@ router.post('/auth/spotify/token', async (req: Request, res: Response) => {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json().catch(() => ({ error: { message: 'Token exchange failed' } }));
-      throw new AppError((errorData as { error?: { message?: string } }).error?.message || 'Failed to exchange authorization code', tokenResponse.status);
+      return next(new AppError((errorData as { error?: { message?: string } }).error?.message || 'Failed to exchange authorization code', tokenResponse.status));
     }
 
     const tokenData = await tokenResponse.json() as {
@@ -137,9 +137,9 @@ router.post('/auth/spotify/token', async (req: Request, res: Response) => {
     });
   } catch (err) {
     if (err instanceof AppError) {
-      throw err;
+      return next(err);
     }
-    throw new AppError('Token exchange failed', 500);
+    next(new AppError('Token exchange failed', 500));
   }
 });
 
