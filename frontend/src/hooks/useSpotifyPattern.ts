@@ -3,9 +3,9 @@
 import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { spotifyApi } from '@/lib/spotify/api';
-import { transformSpotifyAnalysis } from '@/lib/spotify/transform';
+import { transformSpotifyAnalysis, generateFeaturesFromTrack } from '@/lib/spotify/transform';
 import type { GamePattern } from '@/lib/pattern-types';
-import type { SpotifyTrack } from '@/lib/spotify/types';
+import type { SpotifyTrack, SpotifyAudioFeatures } from '@/lib/spotify/types';
 
 interface GenerateSpotifyPatternInput {
   track: SpotifyTrack;
@@ -19,13 +19,29 @@ interface GeneratePatternResponse {
 export function useSpotifyPattern() {
   return useMutation({
     mutationFn: async ({ track, difficulty }: GenerateSpotifyPatternInput) => {
-      // 1. Fetch audio analysis from Spotify
-      const analysis = await spotifyApi.getAudioAnalysis(track.id);
+      let features;
 
-      // 2. Transform to AudioFeatures format
-      const features = transformSpotifyAnalysis(analysis);
+      // Try to get detailed audio analysis first
+      try {
+        const analysis = await spotifyApi.getAudioAnalysis(track.id);
+        features = transformSpotifyAnalysis(analysis);
+      } catch {
+        // Audio Analysis API deprecated - fallback to basic features
+        console.log('Audio Analysis unavailable, using fallback generation');
 
-      // 3. Call backend to generate pattern
+        // Try to get audio features for tempo (may also be deprecated)
+        let audioFeatures: SpotifyAudioFeatures | null = null;
+        try {
+          audioFeatures = await spotifyApi.getAudioFeatures(track.id);
+        } catch {
+          console.log('Audio Features also unavailable, using default tempo');
+        }
+
+        // Generate features from track info
+        features = generateFeaturesFromTrack(track.duration_ms, audioFeatures);
+      }
+
+      // Call backend to generate pattern
       const response = await api.post<GeneratePatternResponse>(
         '/spotify/generate-pattern',
         {

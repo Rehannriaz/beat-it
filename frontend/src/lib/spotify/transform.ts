@@ -1,7 +1,92 @@
 // frontend/src/lib/spotify/transform.ts
 
-import type { SpotifyAudioAnalysis } from './types';
+import type { SpotifyAudioAnalysis, SpotifyAudioFeatures } from './types';
 import type { AudioFeatures } from '@/types/api';
+
+/**
+ * Generate AudioFeatures from basic track info when Audio Analysis API is unavailable.
+ * Uses tempo from audio-features if available, otherwise estimates based on duration.
+ */
+export function generateFeaturesFromTrack(
+  durationMs: number,
+  audioFeatures?: SpotifyAudioFeatures | null
+): AudioFeatures {
+  const duration = durationMs / 1000;
+
+  // Use tempo from audio-features if available, otherwise default to 120 BPM
+  const bpm = audioFeatures?.tempo ?? 120;
+  const energy = audioFeatures?.energy ?? 0.6;
+  const danceability = audioFeatures?.danceability ?? 0.5;
+
+  // Calculate beat interval in seconds
+  const beatInterval = 60 / bpm;
+
+  // Generate beat times
+  const beat_times: number[] = [];
+  for (let t = 0; t < duration; t += beatInterval) {
+    beat_times.push(t);
+  }
+
+  // Generate downbeat times (every 4 beats)
+  const downbeat_times: number[] = [];
+  for (let i = 0; i < beat_times.length; i += 4) {
+    downbeat_times.push(beat_times[i]);
+  }
+
+  // Generate onset times (subset of beats based on energy)
+  const onsetInterval = energy > 0.7 ? 1 : energy > 0.4 ? 2 : 4;
+  const onset_times = beat_times.filter((_, i) => i % onsetInterval === 0);
+  const onset_strengths = onset_times.map(() => 0.5 + Math.random() * 0.5);
+
+  // Generate simple energy curves
+  const numPoints = Math.floor(duration / 0.5); // One point every 0.5 seconds
+  const energy_curve = Array(numPoints).fill(0).map((_, i) => {
+    // Create a basic arc: low at start/end, high in middle
+    const progress = i / numPoints;
+    const arc = Math.sin(progress * Math.PI);
+    return 0.3 + arc * 0.5 * energy;
+  });
+
+  const intensity_curve = [...energy_curve];
+  const bass_energy = energy_curve.map(e => e * (0.8 + Math.random() * 0.4));
+  const mid_energy = energy_curve.map(e => e * (0.7 + Math.random() * 0.6));
+  const high_energy = energy_curve.map(e => e * (0.5 + Math.random() * 0.5));
+
+  // Generate simple song structure sections
+  const segments = [];
+  const sectionDuration = duration / 5;
+  const labels = ['intro', 'verse', 'chorus', 'verse', 'outro'];
+  for (let i = 0; i < 5; i++) {
+    segments.push({
+      start: i * sectionDuration,
+      end: (i + 1) * sectionDuration,
+      label: labels[i],
+    });
+  }
+
+  // Energy segments based on structure
+  const energy_segments = segments.map(seg => ({
+    start: seg.start,
+    end: seg.end,
+    level: seg.label === 'chorus' ? 'high' : seg.label === 'intro' || seg.label === 'outro' ? 'low' : 'medium',
+  }));
+
+  return {
+    bpm,
+    duration,
+    beat_times,
+    downbeat_times,
+    onset_times,
+    onset_strengths,
+    energy_curve,
+    energy_segments,
+    bass_energy,
+    mid_energy,
+    high_energy,
+    segments,
+    intensity_curve,
+  };
+}
 
 /**
  * Infer section labels based on position and loudness.
