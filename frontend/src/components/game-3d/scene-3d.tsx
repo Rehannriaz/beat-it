@@ -331,10 +331,10 @@ function SceneContent({ gameState, theme, onTileHit, speed = 15, pressedKeys = n
       <LaneKeyLabels theme={theme} />
       
       {/* Tiles - memoized to prevent unnecessary re-renders */}
-      {useMemo(() => 
+      {useMemo(() =>
         gameState.tiles.map(tile => (
-          <Tile3DComponent key={tile.id} tile={tile} theme={theme} onHit={handleTileHit} />
-        )), [gameState.tiles, theme, handleTileHit]
+          <Tile3DComponent key={tile.id} tile={tile} theme={theme} speed={speed} onHit={handleTileHit} />
+        )), [gameState.tiles, theme, speed, handleTileHit]
       )}
       
       {/* Hit effects */}

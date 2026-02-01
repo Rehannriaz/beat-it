@@ -23,6 +23,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     method,
     headers: {
       'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true',
       ...headers,
     },
   };
@@ -44,6 +45,9 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 async function uploadFile<T>(endpoint: string, formData: FormData): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+    },
     body: formData,
   });
 

@@ -13,6 +13,14 @@ export interface Tile3D {
   type: 'normal' | 'hold' | 'rapid'
   beatStrength: number
   targetTime: number
+  // Hold tile properties
+  holdDuration?: number
+  holdProgress?: number      // 0-1, how much held so far
+  isHolding?: boolean        // Currently being held
+  holdStartZ?: number        // Z position when hold started
+  // Rapid tile properties
+  rapidCount?: number
+  rapidHitsRemaining?: number
 }
 
 export interface GameState3D {
@@ -156,18 +164,18 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   const hitTile = useCallback((lane: number) => {
     const now = performance.now()
     const lastHitTime = lastHitTimeRef.current[lane] || 0
-    
-    // Throttle: prevent rapid repeated hits on the same lane
+
+    // Throttle: prevent rapid repeated hits on the same lane (but allow rapid tiles to be spammed)
     if (now - lastHitTime < MIN_HIT_INTERVAL) {
       return // Ignore this hit, too soon after the last one
     }
-    
+
     lastHitTimeRef.current[lane] = now
 
     setGameState(prev => {
       // Get current hit zone Z position (matches visual pink stripe)
       const currentHitZoneZ = hitZoneZ
-      
+
       // Tiles are hittable when they're approaching or at the hit zone
       // Allow a window before and slightly after the hit zone for hitting
       // The +1 allows tiles to be hit slightly after passing the hit zone
@@ -194,13 +202,53 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
       // Distance from hit zone (where pink stripe actually is)
       const distance = Math.abs(closestTile.z - currentHitZoneZ)
-      
+
       // Perfect score when tile is well aligned with pink stripe
-      // Increased tolerance for better gameplay - not too strict
-      // Good score when within hit tolerance but not perfectly aligned
-      const perfectThreshold = 0.7 // Reasonable tolerance - allows slight timing variations
+      const perfectThreshold = 0.7
       const hitType = distance <= perfectThreshold ? 'perfect' : 'good'
 
+      // Handle different tile types
+      if (closestTile.type === 'rapid') {
+        // Rapid tile: decrement hits remaining
+        const hitsRemaining = (closestTile.rapidHitsRemaining ?? 1) - 1
+        const isComplete = hitsRemaining <= 0
+
+        const newTiles = prev.tiles.map(tile =>
+          tile.id === closestTile.id
+            ? { ...tile, rapidHitsRemaining: hitsRemaining, hit: isComplete }
+            : tile
+        )
+
+        // Score per tap for rapid tiles
+        const tapScore = 30 * (Math.floor(prev.combo / 10) + 1)
+        const bonusOnComplete = isComplete ? 100 : 0
+
+        return {
+          ...prev,
+          tiles: newTiles,
+          score: prev.score + tapScore + bonusOnComplete,
+          combo: isComplete ? prev.combo + 1 : prev.combo,
+          maxCombo: isComplete ? Math.max(prev.maxCombo, prev.combo + 1) : prev.maxCombo,
+          lastHitFeedback: { lane, type: isComplete ? hitType : 'good', time: Date.now() }
+        }
+      }
+
+      if (closestTile.type === 'hold') {
+        // Hold tile: start holding
+        const newTiles = prev.tiles.map(tile =>
+          tile.id === closestTile.id
+            ? { ...tile, isHolding: true, holdStartZ: tile.z }
+            : tile
+        )
+
+        return {
+          ...prev,
+          tiles: newTiles,
+          lastHitFeedback: { lane, type: 'good', time: Date.now() }
+        }
+      }
+
+      // Normal tile: mark as hit immediately
       const newTiles = prev.tiles.map(tile =>
         tile.id === closestTile.id ? { ...tile, hit: true } : tile
       )
@@ -221,6 +269,51 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       }
     })
   }, [hitTolerance, hitZoneZ])
+
+  // Release hold tiles when key is released
+  const releaseTile = useCallback((lane: number) => {
+    setGameState(prev => {
+      const holdingTile = prev.tiles.find(
+        tile => tile.lane === lane && tile.type === 'hold' && tile.isHolding && !tile.hit && !tile.missed
+      )
+
+      if (!holdingTile) return prev
+
+      const holdProgress = holdingTile.holdProgress ?? 0
+      const isComplete = holdProgress >= 0.8 // 80% is good enough
+
+      const newTiles = prev.tiles.map(tile =>
+        tile.id === holdingTile.id
+          ? { ...tile, isHolding: false, hit: isComplete, missed: !isComplete }
+          : tile
+      )
+
+      if (isComplete) {
+        // Score based on hold completion
+        const baseScore = 100
+        const holdBonus = Math.floor(holdProgress * 100)
+        const comboMultiplier = Math.floor(prev.combo / 10) + 1
+        const scoreIncrease = (baseScore + holdBonus) * comboMultiplier
+
+        return {
+          ...prev,
+          tiles: newTiles,
+          score: prev.score + scoreIncrease,
+          combo: prev.combo + 1,
+          maxCombo: Math.max(prev.maxCombo, prev.combo + 1),
+          lastHitFeedback: { lane, type: 'perfect', time: Date.now() }
+        }
+      } else {
+        // Released too early
+        return {
+          ...prev,
+          tiles: newTiles,
+          combo: 0,
+          lastHitFeedback: { lane, type: 'miss', time: Date.now() }
+        }
+      }
+    })
+  }, [])
 
   const startGame = useCallback(() => {
     spawnedTilesRef.current = new Set()
@@ -408,7 +501,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
                 // Clamp to spawn distance if too far back
                 const initialZ = Math.max(SPAWN_DISTANCE, idealZ)
 
-                newTiles.push({
+                const tile: Tile3D = {
                   id: patternTile.id,
                   lane: patternTile.lane,
                   z: initialZ,
@@ -417,7 +510,22 @@ export function useGame3D(options: UseGame3DOptions = {}) {
                   type: patternTile.type,
                   beatStrength: patternTile.beatStrength ?? 0.5,
                   targetTime: patternTile.time
-                })
+                }
+
+                // Add hold tile properties
+                if (patternTile.type === 'hold' && 'holdDuration' in patternTile) {
+                  tile.holdDuration = patternTile.holdDuration
+                  tile.holdProgress = 0
+                  tile.isHolding = false
+                }
+
+                // Add rapid tile properties
+                if (patternTile.type === 'rapid' && 'rapidCount' in patternTile) {
+                  tile.rapidCount = patternTile.rapidCount
+                  tile.rapidHitsRemaining = patternTile.rapidCount
+                }
+
+                newTiles.push(tile)
               }
             }
           }
@@ -456,17 +564,43 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
         const updatedTiles = newTiles
           .map(tile => {
-            // Always use incremental movement for smooth animation
-            // This prevents jittery movement when gameTime updates in steps (like with Spotify)
-            // The initial spawn position is calculated correctly, then we just move forward smoothly
+            // Calculate if tile is in hit zone
+            const inHitZone = tile.z >= currentHitZoneZ - currentHitTolerance &&
+                              tile.z <= currentHitZoneZ + currentHitTolerance + 1
+
+            // Rapid tiles slow down to 20% speed when in hit zone and not yet completed
+            let tileSpeed = currentSpeed
+            if (tile.type === 'rapid' && inHitZone && !tile.hit && (tile.rapidHitsRemaining ?? 0) > 0) {
+              tileSpeed = currentSpeed * 0.2
+            }
+
+            // Update hold progress if tile is being held
+            let holdProgress = tile.holdProgress
+            if (tile.type === 'hold' && tile.isHolding && tile.holdDuration) {
+              const progressIncrement = deltaTime / tile.holdDuration
+              holdProgress = Math.min(1, (tile.holdProgress ?? 0) + progressIncrement)
+            }
+
             return {
               ...tile,
-              z: tile.z + currentSpeed * deltaTime
+              z: tile.z + tileSpeed * deltaTime,
+              holdProgress
             }
           })
           .map(tile => {
             // Mark as missed if tile has passed the hit zone
             if (!tile.hit && !tile.missed && tile.z > currentHitZoneZ + currentHitTolerance + 2) {
+              // Hold tiles: check if hold was completed
+              if (tile.type === 'hold' && (tile.holdProgress ?? 0) >= 0.8) {
+                return { ...tile, hit: true } // Close enough - count as hit
+              }
+              // Rapid tiles: check if some taps were made
+              if (tile.type === 'rapid' && tile.rapidCount && tile.rapidHitsRemaining !== undefined) {
+                const tapsCompleted = tile.rapidCount - tile.rapidHitsRemaining
+                if (tapsCompleted > 0 && tile.rapidHitsRemaining === 0) {
+                  return { ...tile, hit: true } // All taps completed
+                }
+              }
               return { ...tile, missed: true }
             }
             return tile
@@ -568,6 +702,8 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           next.delete(laneIndex)
           return next
         })
+        // Release hold tiles when key is released
+        releaseTile(laneIndex)
       }
     }
 
@@ -577,7 +713,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
     }
-  }, [gameState.isPlaying, gameState.isPaused, hitTile, pauseGame])
+  }, [gameState.isPlaying, gameState.isPaused, hitTile, releaseTile, pauseGame])
 
   // Debug info for UI
   const currentSpotifyPos = spotifyPositionRef.current
@@ -609,6 +745,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     pauseGame,
     endGame,
     hitTile,
+    releaseTile,
     pattern,
     mode,
     audioRef,

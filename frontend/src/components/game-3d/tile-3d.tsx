@@ -2,7 +2,6 @@
 
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import * as THREE from 'three'
 import type { Mesh } from 'three'
 import type { Theme } from '@/lib/game-types'
 import type { Tile3D } from '@/hooks/use-game-3d'
@@ -10,6 +9,7 @@ import type { Tile3D } from '@/hooks/use-game-3d'
 interface Tile3DProps {
   tile: Tile3D
   theme: Theme
+  speed: number
   onHit?: (lane: number) => void
 }
 
@@ -32,7 +32,7 @@ const themeColors: Record<Theme, { tiles: string[]; glow: string[] }> = {
   }
 }
 
-export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
+export function Tile3DComponent({ tile, theme, speed, onHit }: Tile3DProps) {
   const meshRef = useRef<Mesh>(null)
   const { size } = useThree()
   const [visible, setVisible] = useState(true)
@@ -40,7 +40,7 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
   const colors = themeColors[theme]
   const color = colors.tiles[tile.lane % 4]
   const glowColor = colors.glow[tile.lane % 4]
-  
+
   // Memoize responsive scale calculation
   const scale = useMemo(() => {
     const width = size.width
@@ -51,27 +51,51 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
     if (width >= 1920) return 0.95
     return 1.0
   }, [size.width])
-  
+
   // Memoize lane position
   const laneX = useMemo(() => (-4.5 + tile.lane * 3) * scale, [tile.lane, scale])
 
   // Calculate fade-in opacity based on Z position (tiles spawn at z = -70)
   const spawnOpacity = useMemo(() => {
-    const spawnZ = -70  // Spawn point
-    const fadeEndZ = -60  // Fully visible here
+    const spawnZ = -70
+    const fadeEndZ = -60
     const z = tile.z
-    
-    if (z >= fadeEndZ) return 1.0  // Full opacity after fade-in
-    if (z <= spawnZ) return 0.0     // Fully transparent at spawn
-    
-    // Smooth fade-in from spawn to fadeEndZ
+
+    if (z >= fadeEndZ) return 1.0
+    if (z <= spawnZ) return 0.0
+
     const fadeRange = fadeEndZ - spawnZ
     const distanceFromSpawn = z - spawnZ
     const fadeProgress = distanceFromSpawn / fadeRange
-    // Use smoothstep for smooth fade-in
     const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
     return Math.max(0, Math.min(1, smoothFade))
   }, [tile.z])
+
+  // Calculate hold tail length
+  const holdTailLength = useMemo(() => {
+    if (tile.type !== 'hold' || !tile.holdDuration) return 0
+    return tile.holdDuration * speed
+  }, [tile.type, tile.holdDuration, speed])
+
+  // Rapid tile dots configuration
+  const rapidDots = useMemo(() => {
+    if (tile.type !== 'rapid') return []
+    const count = tile.rapidCount ?? 3
+    const remaining = tile.rapidHitsRemaining ?? count
+    const dots = []
+
+    // Position dots in a row on top of the tile
+    const spacing = 0.4
+    const startX = -((count - 1) * spacing) / 2
+
+    for (let i = 0; i < count; i++) {
+      dots.push({
+        x: startX + i * spacing,
+        active: i < remaining
+      })
+    }
+    return dots
+  }, [tile.type, tile.rapidCount, tile.rapidHitsRemaining])
 
   useEffect(() => {
     if (tile.hit) {
@@ -81,9 +105,8 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
     }
   }, [tile.hit])
 
-  // Memoize tile number calculation
   const tileNum = useMemo(() => parseInt(tile.id.replace(/\D/g, ''), 10) || 0, [tile.id])
-  
+
   useFrame((state) => {
     if (meshRef.current && !tile.hit && !tile.missed) {
       const time = state.clock.elapsedTime
@@ -95,7 +118,7 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
   if (!visible || tile.missed) return null
 
   const baseScale = tile.hit ? hitScale * scale : scale
-  
+
   const handleClick = (e: { stopPropagation: () => void }) => {
     e.stopPropagation()
     if (onHit && !tile.hit && !tile.missed) {
@@ -103,8 +126,18 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
     }
   }
 
+  // Emissive intensity varies by tile type
+  const emissiveIntensity = tile.hit
+    ? 0.5
+    : tile.type === 'rapid'
+      ? 0.35 // Rapid tiles glow brighter
+      : tile.type === 'hold' && tile.isHolding
+        ? 0.4 // Holding tiles glow while held
+        : 0.2
+
   return (
     <group position={[laneX, 0, tile.z]}>
+      {/* Main tile body */}
       <mesh
         ref={meshRef}
         position={[0, 0.15, 0]}
@@ -116,7 +149,7 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
         <meshStandardMaterial
           color={color}
           emissive={color}
-          emissiveIntensity={tile.hit ? 0.5 : 0.2}
+          emissiveIntensity={emissiveIntensity}
           metalness={0.1}
           roughness={0.4}
           transparent
@@ -124,6 +157,7 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
         />
       </mesh>
 
+      {/* Glow top layer */}
       <mesh
         position={[0, 0.47, 0]}
         scale={baseScale}
@@ -141,6 +175,64 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
           opacity={spawnOpacity}
         />
       </mesh>
+
+      {/* Hold tile tail */}
+      {tile.type === 'hold' && holdTailLength > 0 && (
+        <mesh
+          position={[0, 0.1, -holdTailLength / 2 - 0.9]}
+          scale={[baseScale, baseScale, 1]}
+        >
+          <boxGeometry args={[1.8, 0.3, holdTailLength]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={tile.isHolding ? 0.4 : 0.15}
+            metalness={0.1}
+            roughness={0.5}
+            transparent
+            opacity={spawnOpacity * 0.7}
+          />
+        </mesh>
+      )}
+
+      {/* Hold tile tail glow stripe */}
+      {tile.type === 'hold' && holdTailLength > 0 && (
+        <mesh
+          position={[0, 0.27, -holdTailLength / 2 - 0.9]}
+          scale={[baseScale, baseScale, 1]}
+        >
+          <boxGeometry args={[1.6, 0.06, holdTailLength]} />
+          <meshStandardMaterial
+            color={glowColor}
+            emissive={glowColor}
+            emissiveIntensity={tile.isHolding ? 0.5 : 0.2}
+            metalness={0.05}
+            roughness={0.3}
+            transparent
+            opacity={spawnOpacity * 0.6}
+          />
+        </mesh>
+      )}
+
+      {/* Rapid tile dots */}
+      {tile.type === 'rapid' && rapidDots.map((dot, index) => (
+        <mesh
+          key={index}
+          position={[dot.x * baseScale, 0.55, 0]}
+          scale={baseScale * 0.8}
+        >
+          <cylinderGeometry args={[0.15, 0.15, 0.1, 16]} />
+          <meshStandardMaterial
+            color={dot.active ? glowColor : '#444444'}
+            emissive={dot.active ? glowColor : '#222222'}
+            emissiveIntensity={dot.active ? 0.5 : 0.1}
+            metalness={0.2}
+            roughness={0.3}
+            transparent
+            opacity={spawnOpacity}
+          />
+        </mesh>
+      ))}
     </group>
   )
 }
