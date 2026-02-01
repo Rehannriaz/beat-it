@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Mesh } from 'three'
@@ -41,30 +41,25 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
   const color = colors.tiles[tile.lane % 4]
   const glowColor = colors.glow[tile.lane % 4]
   
-  // Calculate responsive scale based on screen size
-  const getScale = () => {
+  // Memoize responsive scale calculation
+  const scale = useMemo(() => {
     const width = size.width
-    // Very small phones - scale down even more
-    if (width < 400) return 0.55 // Scale down to 55% on very small phones
-    // Mobile: scale everything down significantly
-    if (width < 640) return 0.65 // Scale down to 65% on mobile
-    // Small tablets
+    if (width < 400) return 0.55
+    if (width < 640) return 0.65
     if (width < 768) return 0.8
-    // Tablets
     if (width < 1024) return 0.9
-    // Large screens: slightly smaller to fit more
     if (width >= 1920) return 0.95
     return 1.0
-  }
+  }, [size.width])
   
-  const scale = getScale()
-  // Apply scale to lane position
-  const laneX = (-4.5 + tile.lane * 3) * scale
+  // Memoize lane position
+  const laneX = useMemo(() => (-4.5 + tile.lane * 3) * scale, [tile.lane, scale])
 
   // Calculate fade-in opacity based on Z position (tiles spawn at z = -70)
-  const getSpawnFadeOpacity = (z: number): number => {
+  const spawnOpacity = useMemo(() => {
     const spawnZ = -70  // Spawn point
     const fadeEndZ = -60  // Fully visible here
+    const z = tile.z
     
     if (z >= fadeEndZ) return 1.0  // Full opacity after fade-in
     if (z <= spawnZ) return 0.0     // Fully transparent at spawn
@@ -76,9 +71,7 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
     // Use smoothstep for smooth fade-in
     const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
     return Math.max(0, Math.min(1, smoothFade))
-  }
-
-  const spawnOpacity = getSpawnFadeOpacity(tile.z)
+  }, [tile.z])
 
   useEffect(() => {
     if (tile.hit) {
@@ -88,12 +81,13 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
     }
   }, [tile.hit])
 
+  // Memoize tile number calculation
+  const tileNum = useMemo(() => parseInt(tile.id.replace(/\D/g, ''), 10) || 0, [tile.id])
+  
   useFrame((state) => {
     if (meshRef.current && !tile.hit && !tile.missed) {
       const time = state.clock.elapsedTime
-      const tileNum = parseInt(tile.id.replace(/\D/g, ''), 10) || 0
       const float = Math.sin(time * 3 + tileNum * 0.5) * 0.03
-      // Lower tiles closer to the ground
       meshRef.current.position.y = 0.15 + float
     }
   })

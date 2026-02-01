@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useMemo, memo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Mesh } from 'three'
@@ -55,7 +55,7 @@ const themeColors: Record<Theme, { road: string; lines: string; glow: string; ac
   minimal: { road: '#0a0a0a', lines: '#ffffff', glow: '#888888', accent: '#cccccc' }
 }
 
-export function Road({ theme }: RoadProps) {
+export const Road = memo(function Road({ theme }: RoadProps) {
   const colors = themeColors[theme]
   const hitZoneRef = useRef<Mesh>(null)
   const scale = useResponsiveScale()
@@ -70,150 +70,147 @@ export function Road({ theme }: RoadProps) {
 
   // Helper function to calculate fade opacity based on Z position
   // Tiles spawn at z = -70, so we fade gradually from z = -30 to z = -80
-  const getFadeOpacity = (z: number): number => {
-    const fadeStart = -30  // Start fading much earlier for smoother effect
-    const fadeEnd = -80    // Fully transparent well past spawn point at -70
-    
-    if (z > fadeStart) return 1.0  // Full opacity near camera
-    if (z < fadeEnd) return 0.0    // Fully transparent at far end
-    
-    // Very gradual fade using smoothstep for ultra-smooth transition
+  const getFadeOpacity = useMemo(() => {
+    const fadeStart = -30
+    const fadeEnd = -80
     const fadeRange = fadeStart - fadeEnd
-    const distanceFromStart = fadeStart - z
-    const fadeProgress = distanceFromStart / fadeRange
-    // Smoothstep for very smooth fade
-    const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
-    // Apply easing for even smoother fade
-    const easedFade = smoothFade * smoothFade * (3 - 2 * smoothFade)
-    return Math.max(0, 1.0 - easedFade)
-  }
+    
+    return (z: number): number => {
+      if (z > fadeStart) return 1.0
+      if (z < fadeEnd) return 0.0
+      
+      const distanceFromStart = fadeStart - z
+      const fadeProgress = distanceFromStart / fadeRange
+      const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
+      const easedFade = smoothFade * smoothFade * (3 - 2 * smoothFade)
+      return Math.max(0, 1.0 - easedFade)
+    }
+  }, [])
+
+  // Memoize road segments to reduce re-renders
+  const roadSegments = useMemo(() => {
+    const segments: Array<{ z: number; opacity: number }> = []
+    for (let i = 0; i < 15; i++) {
+      const segmentZ = -40 + (i - 7.5) * 6.67
+      const opacity = getFadeOpacity(segmentZ)
+      if (opacity > 0) {
+        segments.push({ z: segmentZ, opacity })
+      }
+    }
+    return segments
+  }, [getFadeOpacity])
+
 
   // Use consistent scale for all geometry - only scale X and Z, not Y
   return (
     <group scale={[scale, scale, scale]}>
-      {/* Main road surface with subtle reflection - segmented for smooth fade */}
-      {Array.from({ length: 30 }).map((_, i) => {
-        const segmentZ = -40 + (i - 15) * 3.33  // Center at -40, segments every ~3.33 units
-        const opacity = getFadeOpacity(segmentZ)
-        if (opacity <= 0) return null
-        return (
+      {/* Main road surface with subtle reflection - reduced segments for performance */}
+      {roadSegments.map((segment, i) => (
           <mesh 
             key={`road-${i}`}
             rotation={[-Math.PI / 2, 0, 0]} 
-            position={[0, -0.5, segmentZ]} 
-            receiveShadow
+            position={[0, -0.5, segment.z]}
           >
-            <planeGeometry args={[12, 3.33]} />
-            <meshStandardMaterial 
-              color={colors.road}
-              roughness={0.7}
-              metalness={0.3}
-              transparent
-              opacity={opacity}
-            />
-          </mesh>
-        )
-      })}
+          <planeGeometry args={[12, 6.67]} />
+          <meshStandardMaterial 
+            color={colors.road}
+            roughness={0.7}
+            metalness={0.3}
+            transparent
+            opacity={segment.opacity}
+          />
+        </mesh>
+      ))}
 
-      {/* Lane dividers - glowing lines with fade */}
+      {/* Lane dividers - glowing lines with fade - reduced segments */}
       {[-3, 0, 3].map((x, i) => (
-        Array.from({ length: 30 }).map((_, j) => {
-          const segmentZ = -40 + (j - 15) * 3.33
-          const opacity = getFadeOpacity(segmentZ)
-          if (opacity <= 0) return null
-          return (
-            <mesh 
-              key={`divider-${i}-${j}`}
-              rotation={[-Math.PI / 2, 0, 0]} 
-              position={[x, -0.48, segmentZ]}
-            >
-              <planeGeometry args={[0.1, 3.33]} />
-              <meshStandardMaterial 
-                color={colors.lines}
-                emissive={colors.lines}
-                emissiveIntensity={0.6}
-                transparent
-                opacity={opacity}
-              />
-            </mesh>
-          )
-        })
-      ))}
-
-      {/* Side borders - thick glowing rails with fade */}
-      {[-6.2, 6.2].map((x, i) => (
-        <group key={i}>
-          {/* Main border line */}
-          {Array.from({ length: 30 }).map((_, j) => {
-            const segmentZ = -40 + (j - 15) * 3.33
-            const opacity = getFadeOpacity(segmentZ)
-            if (opacity <= 0) return null
-            return (
-              <mesh 
-                key={`border-${i}-${j}`}
-                rotation={[-Math.PI / 2, 0, 0]} 
-                position={[x, -0.4, segmentZ]}
-              >
-                <planeGeometry args={[0.3, 3.33]} />
-                <meshStandardMaterial 
-                  color={colors.glow}
-                  emissive={colors.glow}
-                  emissiveIntensity={1.2}
-                  transparent
-                  opacity={opacity}
-                />
-              </mesh>
-            )
-          })}
-          {/* Outer accent line */}
-          {Array.from({ length: 30 }).map((_, j) => {
-            const segmentZ = -40 + (j - 15) * 3.33
-            const opacity = getFadeOpacity(segmentZ)
-            if (opacity <= 0) return null
-            return (
-              <mesh 
-                key={`accent-${i}-${j}`}
-                rotation={[-Math.PI / 2, 0, 0]} 
-                position={[x + (i === 0 ? -0.25 : 0.25), -0.42, segmentZ]}
-              >
-                <planeGeometry args={[0.1, 3.33]} />
-                <meshStandardMaterial 
-                  color={colors.accent}
-                  emissive={colors.accent}
-                  emissiveIntensity={0.8}
-                  transparent
-                  opacity={opacity}
-                />
-              </mesh>
-            )
-          })}
-        </group>
-      ))}
-
-      {/* Perspective grid lines with enhanced fade */}
-      {Array.from({ length: 30 }).map((_, i) => {
-        const z = -i * 3.5
-        const baseOpacity = Math.max(0.1, 0.5 - i * 0.015)
-        const pathFadeOpacity = getFadeOpacity(z)
-        const finalOpacity = Math.min(baseOpacity, pathFadeOpacity)
-        if (finalOpacity <= 0) return null
-        return (
+        roadSegments.map((segment, j) => (
           <mesh 
-            key={i} 
+            key={`divider-${i}-${j}`}
             rotation={[-Math.PI / 2, 0, 0]} 
-            position={[0, -0.47, z]}
+            position={[x, -0.48, segment.z]}
           >
-            <planeGeometry args={[12, 0.04]} />
+            <planeGeometry args={[0.1, 6.67]} />
             <meshStandardMaterial 
               color={colors.lines}
               emissive={colors.lines}
-              emissiveIntensity={0.2}
+              emissiveIntensity={0.6}
               transparent
-              opacity={finalOpacity}
+              opacity={segment.opacity}
             />
           </mesh>
-        )
-      })}
+        ))
+      ))}
+
+      {/* Side borders - thick glowing rails with fade - reduced segments */}
+      {[-6.2, 6.2].map((x, i) => (
+        <group key={i}>
+          {/* Main border line */}
+          {roadSegments.map((segment, j) => (
+            <mesh 
+              key={`border-${i}-${j}`}
+              rotation={[-Math.PI / 2, 0, 0]} 
+              position={[x, -0.4, segment.z]}
+            >
+              <planeGeometry args={[0.3, 6.67]} />
+              <meshStandardMaterial 
+                color={colors.glow}
+                emissive={colors.glow}
+                emissiveIntensity={1.2}
+                transparent
+                opacity={segment.opacity}
+              />
+            </mesh>
+          ))}
+          {/* Outer accent line */}
+          {roadSegments.map((segment, j) => (
+            <mesh 
+              key={`accent-${i}-${j}`}
+              rotation={[-Math.PI / 2, 0, 0]} 
+              position={[x + (i === 0 ? -0.25 : 0.25), -0.42, segment.z]}
+            >
+              <planeGeometry args={[0.1, 6.67]} />
+              <meshStandardMaterial 
+                color={colors.accent}
+                emissive={colors.accent}
+                emissiveIntensity={0.8}
+                transparent
+                opacity={segment.opacity}
+              />
+            </mesh>
+          ))}
+        </group>
+      ))}
+
+      {/* Perspective grid lines with enhanced fade - reduced for performance */}
+      {useMemo(() => {
+        const gridLines: Array<{ z: number; opacity: number }> = []
+        for (let i = 0; i < 20; i++) {
+          const z = -i * 3.5
+          const baseOpacity = Math.max(0.1, 0.5 - i * 0.015)
+          const pathFadeOpacity = getFadeOpacity(z)
+          const finalOpacity = Math.min(baseOpacity, pathFadeOpacity)
+          if (finalOpacity > 0) {
+            gridLines.push({ z, opacity: finalOpacity })
+          }
+        }
+        return gridLines
+      }, [getFadeOpacity]).map((line, i) => (
+        <mesh 
+          key={i} 
+          rotation={[-Math.PI / 2, 0, 0]} 
+          position={[0, -0.47, line.z]}
+        >
+          <planeGeometry args={[12, 0.04]} />
+          <meshStandardMaterial 
+            color={colors.lines}
+            emissive={colors.lines}
+            emissiveIntensity={0.2}
+            transparent
+            opacity={line.opacity}
+          />
+        </mesh>
+      ))}
 
       {/* Hit zone - 3D glowing bar with volume - width matches road (12) and scales with group */}
       {/* Position at ground level (Y = -0.5) to attach to road surface */}
@@ -270,4 +267,4 @@ export function Road({ theme }: RoadProps) {
       </group>
     </group>
   )
-}
+})

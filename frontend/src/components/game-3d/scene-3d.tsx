@@ -36,8 +36,9 @@ function FloatingParticles({ theme }: { theme: Theme }) {
   const groupRef = useRef<Group>(null)
   const colors = themeColors[theme]
   
+  // Reduced particle count for better performance
   const particles = useMemo(() => 
-    Array.from({ length: 30 }).map(() => ({
+    Array.from({ length: 15 }).map(() => ({
       x: (Math.random() - 0.5) * 20,
       y: Math.random() * 8 + 2,
       z: -Math.random() * 80,
@@ -46,10 +47,17 @@ function FloatingParticles({ theme }: { theme: Theme }) {
     }))
   , [])
 
-  useFrame((_, delta) => {
+  // Memoize material to avoid recreating
+  const particleMaterial = useMemo(() => (
+    <meshBasicMaterial color={colors.stars} transparent opacity={0.6} />
+  ), [colors.stars])
+
+  useFrame((state, delta) => {
     if (groupRef.current) {
+      // Use delta for frame-rate independent movement
+      const deltaTime = delta * 60 // Normalize to 60fps
       groupRef.current.children.forEach((child, i) => {
-        child.position.z += particles[i].speed
+        child.position.z += particles[i].speed * deltaTime
         if (child.position.z > 5) {
           child.position.z = -80
         }
@@ -61,8 +69,8 @@ function FloatingParticles({ theme }: { theme: Theme }) {
     <group ref={groupRef}>
       {particles.map((p, i) => (
         <mesh key={i} position={[p.x, p.y, p.z]}>
-          <sphereGeometry args={[p.size, 6, 6]} />
-          <meshBasicMaterial color={colors.stars} transparent opacity={0.6} />
+          <sphereGeometry args={[p.size, 8, 8]} />
+          {particleMaterial}
         </mesh>
       ))}
     </group>
@@ -81,29 +89,26 @@ function LaneKeyLabels({ theme }: { theme: Theme }) {
     return -1.0
   }
   
-  // Responsive font size based on screen width - larger on vertical screens
-  const getFontSize = () => {
+  // Memoize font size calculation to avoid recalculating on every render
+  const fontSize = useMemo(() => {
     const width = size.width
     const height = size.height
     const isPortrait = height > width
     
-    // Base size
     let baseSize = 1.0
     if (width < 640) baseSize = 0.7 * scale
     else if (width < 1024) baseSize = 0.9
     else if (width >= 1920) baseSize = 1.2
     else baseSize = 1.0
     
-    // Increase size on vertical screens for better visibility
     if (isPortrait) {
       baseSize *= 1.3
     }
     
     return baseSize
-  }
+  }, [size.width, size.height, scale])
   
-  const fontSize = getFontSize()
-  const hitZoneZ = getHitZoneZ(scale)
+  const hitZoneZ = useMemo(() => getHitZoneZ(scale), [scale])
   
   return (
     <>
@@ -162,15 +167,15 @@ export function useResponsiveScale() {
   return 1.0
 }
 
-// Responsive camera component - updates in real-time on resize
+// Responsive camera component - only updates on resize, not every frame
 function ResponsiveCamera() {
   const { camera, size } = useThree()
   const cam = camera as THREE.PerspectiveCamera
   const lastSizeRef = useRef({ width: 0, height: 0 })
-  const scale = useResponsiveScale()
+  const cameraStateRef = useRef({ fov: 65, y: 6, z: 8, lookAtY: 0, lookAtZ: -30 })
   
-  useFrame(() => {
-    // Always update camera to ensure lookAt is applied
+  // Calculate camera settings only when size changes
+  useEffect(() => {
     const width = size.width
     const height = size.height
     const aspect = width / height
@@ -179,34 +184,31 @@ function ResponsiveCamera() {
     let fov = 65
     let cameraY = 6
     let cameraZ = 8
-    
-    // Calculate lookAt Y position (horizon height) - higher on mobile/portrait
-    // lookAtZ controls how far ahead we look (further = more track visible)
     let lookAtY = 0
     let lookAtZ = -30
     
     // Very small phones - closer camera with wide FOV
     if (width < 400) {
-      fov = 90 // Very wide FOV for tiny screens
-      cameraY = 6.5 // Higher up to see more lanes
-      cameraZ = 6.5 // Closer to the action
-      lookAtY = 3.5 // Raise horizon significantly - show more track ahead
-      lookAtZ = -25 // Look closer to see more of the track
+      fov = 90
+      cameraY = 6.5
+      cameraZ = 6.5
+      lookAtY = 3.5
+      lookAtZ = -25
     }
     // Mobile phones - closer camera with wide FOV to see all 4 lanes
     else if (width < 640) {
-      fov = 85 // Much wider FOV to see all lanes
-      cameraY = 6.2 // Higher up to see more lanes
-      cameraZ = 6 // Closer to the action
-      lookAtY = 3.0 // Raise horizon - show more track ahead
-      lookAtZ = -25 // Look closer to see more of the track
+      fov = 85
+      cameraY = 6.2
+      cameraZ = 6
+      lookAtY = 3.0
+      lookAtZ = -25
     }
     // Small tablets
     else if (width < 768) {
-      fov = 75 // Slightly wider FOV
+      fov = 75
       cameraY = 6.0
       cameraZ = 7
-      lookAtY = 2.0 // Raise horizon
+      lookAtY = 2.0
       lookAtZ = -28
     }
     // Tablets
@@ -219,7 +221,7 @@ function ResponsiveCamera() {
     }
     // Large screens/TVs
     else if (width >= 1920) {
-      fov = 60 // Narrower FOV for large screens
+      fov = 60
       cameraY = 6.5
       cameraZ = 9
       lookAtY = 0.5
@@ -228,33 +230,30 @@ function ResponsiveCamera() {
     
     // Adjust for landscape vs portrait
     if (height > width) {
-      // Portrait mode - raise horizon significantly and show more track
-      fov += 12 // Even wider FOV in portrait
-      lookAtY += 1.5 // Raise horizon much more in portrait - show more track ahead
-      lookAtZ = -22 // Look much closer in portrait to see more track
-      // Keep camera close in portrait
+      fov += 12
+      lookAtY += 1.5
+      lookAtZ = -22
       if (width >= 640) {
         cameraZ += 0.5
       } else {
-        // On mobile portrait, raise camera more and look further ahead
         cameraY += 0.8
-        lookAtZ = -20 // Even closer look in mobile portrait
-        lookAtY += 0.5 // Extra raise for mobile portrait
+        lookAtZ = -20
+        lookAtY += 0.5
       }
     }
     
-    // Only update projection matrix if size changed
-    if (lastSizeRef.current.width !== size.width || lastSizeRef.current.height !== size.height) {
-      lastSizeRef.current = { width: size.width, height: size.height }
+    // Update camera only if size changed
+    if (lastSizeRef.current.width !== width || lastSizeRef.current.height !== height) {
+      lastSizeRef.current = { width, height }
+      cameraStateRef.current = { fov, y: cameraY, z: cameraZ, lookAtY, lookAtZ }
+      
       cam.fov = fov
       cam.aspect = aspect
       cam.updateProjectionMatrix()
+      cam.position.set(0, cameraY, cameraZ)
+      cam.lookAt(new THREE.Vector3(0, lookAtY, lookAtZ))
     }
-    
-    // Always update position and lookAt to ensure they're applied
-    cam.position.set(0, cameraY, cameraZ)
-    cam.lookAt(new THREE.Vector3(0, lookAtY, lookAtZ)) // Raise horizon by adjusting lookAt Y
-  })
+  }, [size.width, size.height, cam])
   
   return null
 }
@@ -280,6 +279,9 @@ function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
       scene.fog = null
     }
   }, [scene, theme])
+  
+  // Memoize onTileHit callback to prevent tile re-renders
+  const handleTileHit = useMemo(() => onTileHit, [onTileHit])
 
   return (
     <>
@@ -294,8 +296,7 @@ function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
       <directionalLight 
         position={[0, 20, 10]} 
         intensity={0.5}
-        castShadow
-        shadow-mapSize={[1024, 1024]}
+        castShadow={false}
       />
       <directionalLight 
         position={[-5, 10, -10]} 
@@ -319,16 +320,18 @@ function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
       {/* Floating particles */}
       <FloatingParticles theme={theme} />
       
-      {/* Road/corridor */}
-      <Road theme={theme} />
+      {/* Road/corridor - memoized */}
+      {useMemo(() => <Road theme={theme} />, [theme])}
       
       {/* Lane key labels */}
       <LaneKeyLabels theme={theme} />
       
-      {/* Tiles */}
-      {gameState.tiles.map(tile => (
-        <Tile3DComponent key={tile.id} tile={tile} theme={theme} onHit={onTileHit} />
-      ))}
+      {/* Tiles - memoized to prevent unnecessary re-renders */}
+      {useMemo(() => 
+        gameState.tiles.map(tile => (
+          <Tile3DComponent key={tile.id} tile={tile} theme={theme} onHit={handleTileHit} />
+        )), [gameState.tiles, theme, handleTileHit]
+      )}
       
       {/* Hit effects */}
       {gameState.lastHitFeedback && (
@@ -400,9 +403,14 @@ export function Scene3D({ gameState, theme, onTileHit }: Scene3DProps) {
 
   return (
     <Canvas 
-      shadows
+      shadows={false}
       style={{ background: themeBackgrounds[theme] }}
-      gl={{ antialias: true }}
+      gl={{ 
+        antialias: true,
+        powerPreference: "high-performance",
+        stencil: false,
+        depth: true
+      }}
       camera={{ 
         position: cameraSettings.position, 
         fov: cameraSettings.fov, 
@@ -412,6 +420,7 @@ export function Scene3D({ gameState, theme, onTileHit }: Scene3DProps) {
       onCreated={({ camera }) => {
         camera.lookAt(new THREE.Vector3(0, 0, -30))
       }}
+      dpr={[1, 2]}
     >
       <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} />
     </Canvas>
