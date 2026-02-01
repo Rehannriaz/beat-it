@@ -31,8 +31,26 @@ const DEFAULT_SPEED = 15
 const DEFAULT_HIT_TOLERANCE = 3
 const DEFAULT_SPAWN_OFFSET = 4
 
-const HIT_ZONE_Z = 0
 const SPAWN_DISTANCE = -70
+
+// Calculate hit zone Z position to match the visual pink stripe
+// This must match the getHitZoneZ function in road.tsx
+function getHitZoneZ(scale: number): number {
+  if (scale < 0.7) return -2.0
+  if (scale < 0.85) return -1.5
+  return -1.0
+}
+
+// Calculate responsive scale based on window width (must match useResponsiveScale)
+function calculateScale(): number {
+  if (typeof window === 'undefined') return 1.0
+  const width = window.innerWidth
+  if (width < 400) return 0.55
+  if (width < 640) return 0.65
+  if (width < 768) return 0.8
+  if (width < 1024) return 0.9
+  return 1.0
+}
 
 export type UseGame3DOptions = {
   pattern?: GamePattern | null
@@ -54,6 +72,23 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     ? pattern.settings.hitTolerance / 4
     : DEFAULT_HIT_TOLERANCE
 
+  // Calculate hit zone Z position to match visual pink stripe
+  const [hitZoneZ, setHitZoneZ] = useState(() => {
+    const scale = calculateScale()
+    return getHitZoneZ(scale)
+  })
+
+  // Update hit zone Z when window resizes
+  useEffect(() => {
+    const updateHitZone = () => {
+      const scale = calculateScale()
+      setHitZoneZ(getHitZoneZ(scale))
+    }
+    
+    updateHitZone()
+    window.addEventListener('resize', updateHitZone)
+    return () => window.removeEventListener('resize', updateHitZone)
+  }, [])
 
   const [gameState, setGameState] = useState<GameState3D>({
     tiles: [],
@@ -76,12 +111,14 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   const speedRef = useRef(speed)
   const spawnOffsetRef = useRef(spawnOffset)
   const hitToleranceRef = useRef(hitTolerance)
+  const hitZoneZRef = useRef(hitZoneZ)
 
   patternRef.current = pattern
   modeRef.current = mode
   speedRef.current = speed
   spawnOffsetRef.current = spawnOffset
   hitToleranceRef.current = hitTolerance
+  hitZoneZRef.current = hitZoneZ
 
   const endlessSpawnTimerRef = useRef<number>(0)
   const endlessTileIdRef = useRef<number>(0)
@@ -107,12 +144,18 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
   const hitTile = useCallback((lane: number) => {
     setGameState(prev => {
+      // Get current hit zone Z position (matches visual pink stripe)
+      const currentHitZoneZ = hitZoneZ
+      
+      // Tiles are hittable when they're approaching or at the hit zone
+      // Allow a window before and slightly after the hit zone for hitting
+      // The +1 allows tiles to be hit slightly after passing the hit zone
       const hittableTiles = prev.tiles.filter(
         tile =>
           tile.lane === lane &&
           !tile.hit &&
           !tile.missed &&
-          tile.z >= -hitTolerance && tile.z <= hitTolerance + 1
+          tile.z >= currentHitZoneZ - hitTolerance && tile.z <= currentHitZoneZ + hitTolerance + 1
       )
 
       if (hittableTiles.length === 0) {
@@ -123,12 +166,19 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         }
       }
 
+      // Find the tile closest to the hit zone
       const closestTile = hittableTiles.reduce((closest, tile) =>
-        Math.abs(tile.z) < Math.abs(closest.z) ? tile : closest
+        Math.abs(tile.z - currentHitZoneZ) < Math.abs(closest.z - currentHitZoneZ) ? tile : closest
       )
 
-      const distance = Math.abs(closestTile.z)
-      const hitType = distance < 1.2 ? 'perfect' : 'good'
+      // Distance from hit zone (where pink stripe actually is)
+      const distance = Math.abs(closestTile.z - currentHitZoneZ)
+      
+      // Perfect score only when tile is exactly aligned with pink stripe
+      // Use a very tight tolerance for perfect - only when very close to hit zone Z
+      // Good score when within hit tolerance but not perfectly aligned
+      const perfectThreshold = 0.3 // Very tight - only when almost exactly at hit zone
+      const hitType = distance <= perfectThreshold ? 'perfect' : 'good'
 
       const newTiles = prev.tiles.map(tile =>
         tile.id === closestTile.id ? { ...tile, hit: true } : tile
@@ -149,7 +199,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         lastHitFeedback: { lane, type: hitType, time: Date.now() }
       }
     })
-  }, [hitTolerance])
+  }, [hitTolerance, hitZoneZ])
 
   const startGame = useCallback(() => {
     spawnedTilesRef.current = new Set()
@@ -269,6 +319,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         const currentPattern = patternRef.current
         const currentSpeed = speedRef.current
         const currentSpawnOffset = spawnOffsetRef.current
+        const currentHitZoneZ = hitZoneZRef.current
 
         if (currentMode === 'pattern' && currentPattern?.tiles) {
           for (const patternTile of currentPattern.tiles) {
@@ -278,8 +329,11 @@ export function useGame3D(options: UseGame3DOptions = {}) {
               spawnedTilesRef.current.add(patternTile.id)
 
               const timeUntilHit = patternTile.time - newGameTime
-              const idealZ = -(currentSpeed * timeUntilHit)
-              const initialZ = Math.max(SPAWN_DISTANCE, Math.min(-5, idealZ))
+              // Calculate ideal Z position relative to hit zone
+              // Tile should reach currentHitZoneZ at patternTile.time
+              const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
+              // Always use ideal position, but clamp to spawn distance if too far back
+              const initialZ = Math.max(SPAWN_DISTANCE, idealZ)
 
               newTiles.push({
                 id: patternTile.id,
@@ -327,12 +381,35 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         }
 
         const updatedTiles = newTiles
-          .map(tile => ({
-            ...tile,
-            z: tile.z + currentSpeed * deltaTime
-          }))
           .map(tile => {
-            if (!tile.hit && !tile.missed && tile.z > HIT_ZONE_Z + currentHitTolerance + 2) {
+            // For pattern mode, always use precise time-based positioning
+            // This ensures tiles are always in the correct position relative to hit zone
+            if (currentMode === 'pattern' && currentPattern?.tiles) {
+              const patternTile = currentPattern.tiles.find(pt => pt.id === tile.id)
+              if (patternTile) {
+                const timeUntilHit = patternTile.time - newGameTime
+                // Calculate ideal Z position relative to hit zone
+                // Hit zone is at currentHitZoneZ, so tile should reach currentHitZoneZ at patternTile.time
+                const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
+                
+                // Always use precise positioning for pattern tiles
+                // This ensures perfect sync without any visible corrections
+                return {
+                  ...tile,
+                  z: idealZ
+                }
+              }
+            }
+            
+            // Default movement for endless mode
+            return {
+              ...tile,
+              z: tile.z + currentSpeed * deltaTime
+            }
+          })
+          .map(tile => {
+            // Mark as missed if tile has passed the hit zone
+            if (!tile.hit && !tile.missed && tile.z > currentHitZoneZ + currentHitTolerance + 2) {
               return { ...tile, missed: true }
             }
             return tile
