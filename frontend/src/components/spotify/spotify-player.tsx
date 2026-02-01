@@ -8,9 +8,10 @@ import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX } from 'lucide-rea
 interface SpotifyPlayerProps {
   trackUri?: string
   onPositionChange?: (position: number) => void
+  isPaused?: boolean // External control for pause/resume
 }
 
-export function SpotifyPlayer({ trackUri, onPositionChange }: SpotifyPlayerProps) {
+export function SpotifyPlayer({ trackUri, onPositionChange, isPaused: externalIsPaused }: SpotifyPlayerProps) {
   const {
     isReady,
     isPlaying,
@@ -29,6 +30,7 @@ export function SpotifyPlayer({ trackUri, onPositionChange }: SpotifyPlayerProps
 
   const [isMuted, setIsMuted] = useState(false)
   const previousVolumeRef = useRef(volume)
+  const lastExternalPauseStateRef = useRef<boolean | undefined>(undefined)
 
   // Notify parent of position changes
   useEffect(() => {
@@ -46,6 +48,33 @@ export function SpotifyPlayer({ trackUri, onPositionChange }: SpotifyPlayerProps
       })
     }
   }, [trackUri, isReady, play, currentTrack?.uri])
+
+  // Sync with external pause/resume control
+  useEffect(() => {
+    if (externalIsPaused === undefined || !isReady || !currentTrack) return
+
+    // Only sync if the external pause state has actually changed
+    if (lastExternalPauseStateRef.current === externalIsPaused) return
+    lastExternalPauseStateRef.current = externalIsPaused
+
+    const syncPlayback = async () => {
+      try {
+        if (externalIsPaused && isPlaying) {
+          // External wants paused, but we're playing
+          console.log('Pausing Spotify due to game pause')
+          await pause()
+        } else if (!externalIsPaused && !isPlaying) {
+          // External wants playing, but we're paused
+          console.log('Resuming Spotify due to game resume')
+          await resume()
+        }
+      } catch (error) {
+        console.error('Failed to sync Spotify playback:', error)
+      }
+    }
+
+    syncPlayback()
+  }, [externalIsPaused, isReady, isPlaying, currentTrack, pause, resume])
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!duration) return

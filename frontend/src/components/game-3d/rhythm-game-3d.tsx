@@ -63,6 +63,7 @@ export function RhythmGame3D() {
     spotifyPosition: spotifyTrack ? spotifyPosition : undefined,
   })
 
+
   const handleUploadComplete = (song: Song) => {
     setUploadedSong(song)
     if (song.pattern) {
@@ -115,6 +116,7 @@ export function RhythmGame3D() {
           <SpotifyPlayer
             trackUri={spotifyTrack.uri}
             onPositionChange={setSpotifyPosition}
+            isPaused={gameState.isPaused}
           />
         </div>
       )}

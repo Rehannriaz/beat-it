@@ -50,6 +50,10 @@ router.get('/callback', async (req: Request, res: Response) => {
     if (code) {
       // Redirect to frontend with code - frontend will handle token exchange
       redirectUrl.searchParams.set('code', code as string);
+      // Preserve state parameter so frontend knows where to redirect after auth
+      if (state) {
+        redirectUrl.searchParams.set('state', state as string);
+      }
       return res.redirect(redirectUrl.toString());
     }
 
