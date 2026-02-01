@@ -68,6 +68,28 @@ export const Road = memo(function Road({ theme, speed = 15, isPlaying = false }:
   const roadGroupRef = useRef<Group>(null)
   const scale = useResponsiveScale()
 
+  // Smooth fade function for back end (spawn area)
+  const getFadeOpacity = useMemo(() => {
+    const fadeStart = -50  // Start fading here
+    const fadeEnd = -80    // Fully transparent at spawn
+    const fadeRange = fadeStart - fadeEnd
+    
+    return (worldZ: number): number => {
+      if (worldZ > fadeStart) return 1.0
+      if (worldZ < fadeEnd) return 0.0
+      
+      const distanceFromStart = fadeStart - worldZ
+      const fadeProgress = distanceFromStart / fadeRange
+      
+      // Ultra-smooth fade with multiple smoothstep passes
+      let smooth = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
+      smooth = smooth * smooth * (3 - 2 * smooth)  // Second pass
+      smooth = smooth * smooth * (3 - 2 * smooth)  // Third pass for extra smoothness
+      
+      return Math.max(0, 1.0 - smooth)
+    }
+  }, [])
+
   // Animate hit zone glow and move road like a treadmill
   useFrame((state, delta) => {
     if (hitZoneRef.current) {
@@ -83,6 +105,29 @@ export const Road = memo(function Road({ theme, speed = 15, isPlaying = false }:
       if (roadGroupRef.current.position.z >= SEGMENT_LENGTH) {
         roadGroupRef.current.position.z -= SEGMENT_LENGTH
       }
+      
+      // Update opacity for fade effect at back end
+      const groupZ = roadGroupRef.current.position.z
+      roadGroupRef.current.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.material) {
+          const material = child.material as THREE.MeshStandardMaterial
+          if (material) {
+            const worldZ = child.position.z + groupZ
+            // Only apply fade in the spawn area
+            if (worldZ <= -50 && worldZ >= -80) {
+              const opacity = getFadeOpacity(worldZ)
+              material.opacity = opacity
+              material.transparent = true
+            } else if (worldZ < -80) {
+              material.opacity = 0
+              material.transparent = true
+            } else {
+              material.opacity = 1.0
+              material.transparent = false
+            }
+          }
+        }
+      })
     }
   })
 

@@ -37,14 +37,14 @@ function FloatingParticles({ theme }: { theme: Theme }) {
   const groupRef = useRef<Group>(null)
   const colors = themeColors[theme]
   
-  // Reduced particle count for better performance
-  const particles = useMemo(() => 
-    Array.from({ length: 15 }).map(() => ({
-      x: (Math.random() - 0.5) * 20,
-      y: Math.random() * 8 + 2,
-      z: -Math.random() * 80,
+  // Moderate particle count - enough for effect without hurting performance
+  const particles = useMemo(() =>
+    Array.from({ length: 25 }).map(() => ({
+      x: (Math.random() - 0.5) * 50,  // Wider horizontal spread
+      y: Math.random() * 15 + 1,      // Higher vertical range
+      z: -Math.random() * 100,        // Deeper spawn area
       speed: Math.random() * 0.3 + 0.1,
-      size: Math.random() * 0.08 + 0.03
+      size: Math.random() * 0.12 + 0.06  // Larger particles for better visibility
     }))
   , [])
 
@@ -59,7 +59,8 @@ function FloatingParticles({ theme }: { theme: Theme }) {
       const deltaTime = delta * 60 // Normalize to 60fps
       groupRef.current.children.forEach((child, i) => {
         child.position.z += particles[i].speed * deltaTime
-        if (child.position.z > 5) {
+        // Reset when particles pass far behind the camera (much further than before)
+        if (child.position.z > 30) {
           child.position.z = -80
         }
       })
@@ -266,8 +267,8 @@ function SceneContent({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps)
   // Add fog effect for gradual fade in the distance
   useEffect(() => {
     // Using exponential fog for smoother, more gradual fade
-    // density controls how quickly it fades - lower = more gradual
-    const fog = new THREE.FogExp2(themeBackgrounds[theme], 0.018)
+    // Enhanced fog to better mask road fade - slightly denser
+    const fog = new THREE.FogExp2(themeBackgrounds[theme], 0.025)
     scene.fog = fog
 
     return () => {
