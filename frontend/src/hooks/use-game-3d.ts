@@ -29,7 +29,7 @@ export interface GameState3D {
 
 const DEFAULT_SPEED = 15
 const DEFAULT_HIT_TOLERANCE = 3
-const DEFAULT_SPAWN_OFFSET = 4
+const DEFAULT_SPAWN_OFFSET = 2.5 // Reduced to make tiles arrive earlier
 
 const SPAWN_DISTANCE = -70
 
@@ -174,10 +174,10 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       // Distance from hit zone (where pink stripe actually is)
       const distance = Math.abs(closestTile.z - currentHitZoneZ)
       
-      // Perfect score only when tile is exactly aligned with pink stripe
-      // Use a very tight tolerance for perfect - only when very close to hit zone Z
+      // Perfect score when tile is well aligned with pink stripe
+      // Increased tolerance for better gameplay - not too strict
       // Good score when within hit tolerance but not perfectly aligned
-      const perfectThreshold = 0.3 // Very tight - only when almost exactly at hit zone
+      const perfectThreshold = 0.7 // Reasonable tolerance - allows slight timing variations
       const hitType = distance <= perfectThreshold ? 'perfect' : 'good'
 
       const newTiles = prev.tiles.map(tile =>
