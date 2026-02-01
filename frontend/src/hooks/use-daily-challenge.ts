@@ -11,39 +11,36 @@ import type { SpotifyTrack } from '@/lib/spotify/types'
 const PLAYLIST_CACHE_KEY = 'daily_challenge_playlist'
 const PLAYLIST_CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
-// Fallback playlist IDs to try in order
-// Different playlists have different regional availability
-const FALLBACK_PLAYLIST_IDS = [
-  '37i9dQZF1DXcBWIGoYBM5M', // Today's Top Hits
-  '37i9dQZEVXbMDoHDwVN2tF', // Global Top 50
-  '37i9dQZEVXbLiRSasKsNU9', // Viral 50 Global
-  '37i9dQZF1DX0XUsuxWHRQd', // RapCaviar
-  '37i9dQZF1DX4JAvHpjipBk', // New Music Friday
-]
-
 interface CachedPlaylist {
   tracks: SpotifyTrack[]
   cachedAt: number
 }
 
-async function fetchPlaylistWithFallback(): Promise<SpotifyTrack[]> {
-  for (const playlistId of FALLBACK_PLAYLIST_IDS) {
-    try {
-      const response = await spotifyApi.getPlaylistTracks(playlistId, 100)
-      const tracks = response.items
-        .map(item => item.track)
-        .filter((track): track is SpotifyTrack => track !== null)
+async function fetchTracksFromUserPlaylists(): Promise<SpotifyTrack[]> {
+  // Get user's playlists
+  const playlistsResponse = await spotifyApi.getMyPlaylists(50)
 
-      if (tracks.length > 0) {
+  if (playlistsResponse.items.length === 0) {
+    throw new Error('No playlists found')
+  }
+
+  // Try each playlist until we get tracks
+  for (const playlist of playlistsResponse.items) {
+    try {
+      const tracksResponse = await spotifyApi.getPlaylistTracks(playlist.id, 100)
+      const tracks = tracksResponse.items
+        .map(item => item.track)
+        .filter((track): track is SpotifyTrack => track !== null && track.id !== null)
+
+      if (tracks.length >= 10) {
         return tracks
       }
     } catch (error) {
-      console.warn(`Failed to fetch playlist ${playlistId}:`, error)
-      // Continue to next fallback
+      console.warn(`Failed to fetch playlist ${playlist.id}:`, error)
     }
   }
 
-  throw new Error('Could not fetch any playlist. Please try again later.')
+  throw new Error('Could not fetch tracks from any playlist')
 }
 
 export function useDailyChallenge() {
@@ -89,9 +86,9 @@ export function useDailyChallenge() {
         }
       }
 
-      // Fetch if not cached
+      // Fetch from user's playlists if not cached
       if (tracks.length === 0) {
-        tracks = await fetchPlaylistWithFallback()
+        tracks = await fetchTracksFromUserPlaylists()
 
         localStorage.setItem(PLAYLIST_CACHE_KEY, JSON.stringify({
           tracks,
@@ -112,7 +109,7 @@ export function useDailyChallenge() {
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2, // Retry twice on failure
+    retry: 1,
   })
 
   const hasSpotifyAuth = !!getStoredAccessToken()
