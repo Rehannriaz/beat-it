@@ -517,46 +517,53 @@ export function useGame3D(options: UseGame3DOptions = {}) {
             for (const patternTile of currentPattern.tiles) {
               const spawnTime = patternTile.time - currentSpawnOffset
 
-              // Only spawn if we haven't already spawned this tile
-              // AND the spawn time is reasonable (not too far in the past)
-              // Allow spawning tiles up to 2 seconds in the past to catch up
-              if (spawnTime <= newGameTime && 
-                  spawnTime >= newGameTime - 2.0 && // Allow catching up tiles up to 2s in the past
-                  !spawnedTilesRef.current.has(patternTile.id)) {
-                spawnedTilesRef.current.add(patternTile.id)
+              // Skip if already processed
+              if (spawnedTilesRef.current.has(patternTile.id)) continue
 
-                const timeUntilHit = patternTile.time - newGameTime
-                // Calculate ideal Z position relative to hit zone
-                const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
-                // Clamp to spawn distance if too far back
-                const initialZ = Math.max(SPAWN_DISTANCE, idealZ)
+              // Check if spawn time has passed
+              if (spawnTime > newGameTime) continue
 
-                const tile: Tile3D = {
-                  id: patternTile.id,
-                  lane: patternTile.lane,
-                  z: initialZ,
-                  hit: false,
-                  missed: false,
-                  type: patternTile.type,
-                  beatStrength: patternTile.beatStrength ?? 0.5,
-                  targetTime: patternTile.time
-                }
+              // Mark tile as processed (either spawned or skipped)
+              spawnedTilesRef.current.add(patternTile.id)
 
-                // Add hold tile properties
-                if (patternTile.type === 'hold' && 'holdDuration' in patternTile) {
-                  tile.holdDuration = patternTile.holdDuration
-                  tile.holdProgress = 0
-                  tile.isHolding = false
-                }
-
-                // Add rapid tile properties
-                if (patternTile.type === 'rapid' && 'rapidCount' in patternTile) {
-                  tile.rapidCount = patternTile.rapidCount
-                  tile.rapidHitsRemaining = patternTile.rapidCount
-                }
-
-                newTiles.push(tile)
+              // Only actually spawn tiles that are within 2 seconds of current time
+              // Tiles older than 2 seconds are skipped (counted as processed but not rendered)
+              if (spawnTime < newGameTime - 2.0) {
+                // Tile is too old - skip it but it's still counted as "spawned" for game-over detection
+                continue
               }
+
+              const timeUntilHit = patternTile.time - newGameTime
+              // Calculate ideal Z position relative to hit zone
+              const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
+              // Clamp to spawn distance if too far back
+              const initialZ = Math.max(SPAWN_DISTANCE, idealZ)
+
+              const tile: Tile3D = {
+                id: patternTile.id,
+                lane: patternTile.lane,
+                z: initialZ,
+                hit: false,
+                missed: false,
+                type: patternTile.type,
+                beatStrength: patternTile.beatStrength ?? 0.5,
+                targetTime: patternTile.time
+              }
+
+              // Add hold tile properties
+              if (patternTile.type === 'hold' && 'holdDuration' in patternTile) {
+                tile.holdDuration = patternTile.holdDuration
+                tile.holdProgress = 0
+                tile.isHolding = false
+              }
+
+              // Add rapid tile properties
+              if (patternTile.type === 'rapid' && 'rapidCount' in patternTile) {
+                tile.rapidCount = patternTile.rapidCount
+                tile.rapidHitsRemaining = patternTile.rapidCount
+              }
+
+              newTiles.push(tile)
             }
           }
         } else {
@@ -592,6 +599,9 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           })
         }
 
+        // Track hold tiles that complete by passing the hit zone (for scoring)
+        const completedHoldTiles: Tile3D[] = []
+
         const updatedTiles = newTiles
           .map(tile => {
             // Calculate if tile is in hit zone
@@ -622,7 +632,9 @@ export function useGame3D(options: UseGame3DOptions = {}) {
             if (!tile.hit && !tile.missed && tile.z > currentHitZoneZ + currentHitTolerance + 2) {
               // Hold tiles: check if hold was completed
               if (tile.type === 'hold' && (tile.holdProgress ?? 0) >= 0.8) {
-                return { ...tile, hit: true } // Close enough - count as hit
+                // Track this tile for scoring
+                completedHoldTiles.push(tile)
+                return { ...tile, hit: true, isHolding: false } // Mark as hit and stop holding
               }
               // Rapid tiles: check if some taps were made
               if (tile.type === 'rapid' && tile.rapidCount && tile.rapidHitsRemaining !== undefined) {
@@ -643,6 +655,26 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
         let newCombo = prev.combo
         let newMisses = prev.misses
+        let newScore = prev.score
+        let newPerfectHits = prev.perfectHits
+        let newMaxCombo = prev.maxCombo
+        let lastHitFeedback = prev.lastHitFeedback
+
+        // Award points for hold tiles that completed by passing the hit zone
+        for (const holdTile of completedHoldTiles) {
+          const holdProgress = holdTile.holdProgress ?? 0
+          const baseScore = 100
+          const holdBonus = Math.floor(holdProgress * 100)
+          const comboMultiplier = Math.floor(newCombo / 10) + 1
+          const scoreIncrease = (baseScore + holdBonus) * comboMultiplier
+
+          newScore += scoreIncrease
+          newCombo += 1
+          newMaxCombo = Math.max(newMaxCombo, newCombo)
+          newPerfectHits += 1
+          lastHitFeedback = { lane: holdTile.lane, type: 'perfect', time: Date.now() }
+        }
+
         if (newlyMissed.length > 0) {
           newCombo = 0
           newMisses = prev.misses + newlyMissed.length
@@ -665,9 +697,13 @@ export function useGame3D(options: UseGame3DOptions = {}) {
             return {
               ...prev,
               tiles: updatedTiles,
+              score: newScore,
               combo: newCombo,
+              maxCombo: newMaxCombo,
+              perfectHits: newPerfectHits,
               misses: newMisses,
               gameTime: newGameTime,
+              lastHitFeedback,
               isPlaying: false,
               gameOver: true
             }
@@ -677,9 +713,13 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         return {
           ...prev,
           tiles: updatedTiles,
+          score: newScore,
           combo: newCombo,
+          maxCombo: newMaxCombo,
+          perfectHits: newPerfectHits,
           misses: newMisses,
-          gameTime: newGameTime
+          gameTime: newGameTime,
+          lastHitFeedback
         }
       })
 
