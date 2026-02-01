@@ -25,9 +25,9 @@ export function StepSearch({ theme, onTrackSelect }: StepSearchProps) {
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
-        className="text-center py-8"
+        className="text-center py-4 sm:py-6 md:py-8 px-2"
       >
-        <p className="mb-4" style={{ color: styles.textColor }}>
+        <p className="mb-3 sm:mb-4 text-sm sm:text-base" style={{ color: styles.textColor }}>
           Connect to Spotify to search for songs
         </p>
         <SpotifyLogin />

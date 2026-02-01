@@ -64,7 +64,7 @@ export function SpotifyWizard({ isOpen, onClose, onComplete, theme }: SpotifyWiz
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="relative w-full max-w-lg mx-4 rounded-2xl p-6"
+        className="relative w-full max-w-lg mx-2 sm:mx-4 rounded-xl sm:rounded-2xl p-4 sm:p-6 max-h-[90vh] overflow-y-auto"
         style={{
           background: 'rgba(20,20,30,0.95)',
           border: `1px solid ${styles.glowColor}40`,
@@ -74,15 +74,15 @@ export function SpotifyWizard({ isOpen, onClose, onComplete, theme }: SpotifyWiz
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-4 right-4"
+          className="absolute top-2 sm:top-4 right-2 sm:right-4"
           onClick={handleClose}
           style={{ color: styles.textColor }}
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4 sm:w-5 sm:h-5" />
         </Button>
 
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-2" style={{ color: styles.textColor }}>
+        <div className="mb-4 sm:mb-6 pr-8 sm:pr-12">
+          <h2 className="text-xl sm:text-2xl font-bold mb-2" style={{ color: styles.textColor }}>
             {step === 'search' ? 'Search Spotify' : 'Generate Pattern'}
           </h2>
           <div className="flex gap-2">
@@ -104,7 +104,7 @@ export function SpotifyWizard({ isOpen, onClose, onComplete, theme }: SpotifyWiz
         {step === 'generate' && (
           <button
             onClick={handleBack}
-            className="text-sm opacity-60 hover:opacity-100 mb-4"
+            className="text-xs sm:text-sm opacity-60 hover:opacity-100 mb-3 sm:mb-4"
             style={{ color: styles.textColor }}
           >
             ← Back to search

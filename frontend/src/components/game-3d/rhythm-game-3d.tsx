@@ -13,7 +13,7 @@ import type { Theme } from '@/lib/game-types'
 import type { Song } from '@/types/api'
 import type { GamePattern } from '@/lib/pattern-types'
 import type { SpotifyTrack } from '@/lib/spotify/types'
-import { themeStyles } from '@/lib/game-types'
+import { themeStyles, LANE_KEYS } from '@/lib/game-types'
 
 // Dynamically import Scene3D to avoid SSR issues with Three.js
 const Scene3D = dynamic(
@@ -56,7 +56,7 @@ export function RhythmGame3D() {
   // Use spotify pattern, uploaded pattern, or example pattern (in priority order)
   const activePattern = spotifyPattern || uploadedPattern || examplePattern
 
-  const { gameState, startGame, pauseGame, endGame, mode } = useGame3D({
+  const { gameState, startGame, pauseGame, endGame, hitTile, mode } = useGame3D({
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
     audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
@@ -91,6 +91,41 @@ export function RhythmGame3D() {
       {/* HUD - only show when playing */}
       {gameState.isPlaying && !gameState.isPaused && (
         <HUD3D gameState={gameState} theme={theme} />
+      )}
+
+      {/* Touch/Click Controls - show when playing */}
+      {gameState.isPlaying && !gameState.isPaused && (
+        <div className="absolute bottom-0 left-0 right-0 flex justify-center pb-4 pointer-events-none">
+          <div className="flex gap-2 pointer-events-auto">
+            {LANE_KEYS.map((key, index) => {
+              const styles = themeStyles[theme]
+              const laneColors = ['#ff71ce', '#b967ff', '#05ffa1', '#00f5ff']
+              return (
+                <button
+                  key={key}
+                  onPointerDown={(e) => {
+                    e.preventDefault()
+                    hitTile(index)
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault()
+                    hitTile(index)
+                  }}
+                  className="w-16 h-20 sm:w-20 sm:h-24 rounded-xl flex flex-col items-center justify-center transition-transform active:scale-95 select-none"
+                  style={{
+                    background: `linear-gradient(180deg, ${laneColors[index]}40 0%, ${laneColors[index]}20 100%)`,
+                    border: `2px solid ${laneColors[index]}`,
+                    boxShadow: `0 0 20px ${laneColors[index]}40`,
+                  }}
+                >
+                  <span className="text-2xl sm:text-3xl font-bold" style={{ color: laneColors[index] }}>
+                    {key}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       )}
 
       {/* Upload Wizard */}

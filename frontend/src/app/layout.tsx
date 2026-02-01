@@ -22,6 +22,12 @@ export const metadata: Metadata = {
   title: 'Rhythm Rush - Beat the Tiles',
   description: 'A fast-paced rhythm game with multiple visual themes',
   generator: 'v0.app',
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
   icons: {
     icon: [
       {
