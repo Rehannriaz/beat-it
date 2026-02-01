@@ -81,7 +81,7 @@ export function RhythmGame3D() {
     startGame()
   }
 
-  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys, debugInfo, accuracy } = useGame3D({
+  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys, accuracy } = useGame3D({
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
     audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
@@ -292,68 +292,7 @@ export function RhythmGame3D() {
 
       {/* HUD - only show when playing */}
       {gameState.isPlaying && !gameState.isPaused && (
-        <>
-          <HUD3D gameState={gameState} theme={theme} onPause={pauseGame} />
-          {/* Debug panel */}
-          <div className="absolute top-20 left-4 bg-black/90 text-white text-xs p-3 rounded font-mono z-50 max-w-sm overflow-auto max-h-96">
-            <div className="font-bold mb-2 text-yellow-400">Debug Info</div>
-            <div>GameTime: {debugInfo.gameTime.toFixed(2)}s</div>
-            <div>Spotify Pos: {debugInfo.spotifyPosition !== undefined ? debugInfo.spotifyPosition.toFixed(2) : 'N/A'}s</div>
-            {debugInfo.smoothedPosition !== undefined && (
-              <div>Smoothed Pos: {debugInfo.smoothedPosition.toFixed(2)}s</div>
-            )}
-            <div>Spotify Synced: {debugInfo.spotifySynced ? '✅ Yes' : '❌ No'}</div>
-            <div>Using Spotify: {debugInfo.isUsingSpotify ? 'Yes' : 'No'}</div>
-            <div>Can Spawn: {debugInfo.canSpawn ? '✅ Yes' : '❌ No'}</div>
-            <div className="mt-2 pt-2 border-t border-white/20">
-              <div className="font-semibold mb-1">Sync Metrics:</div>
-              {debugInfo.syncDifference !== null && (
-                <div className={Math.abs(debugInfo.syncDifference) < 0.05 ? 'text-green-400' : 'text-yellow-400'}>
-                  Diff: {debugInfo.syncDifference > 0 ? '+' : ''}{debugInfo.syncDifference.toFixed(3)}s
-                </div>
-              )}
-              {debugInfo.smoothedSyncDifference !== null && (
-                <div className={Math.abs(debugInfo.smoothedSyncDifference) < 0.05 ? 'text-green-400' : 'text-yellow-400'}>
-                  Smoothed Diff: {debugInfo.smoothedSyncDifference > 0 ? '+' : ''}{debugInfo.smoothedSyncDifference.toFixed(3)}s
-                </div>
-              )}
-              {debugInfo.jitter > 0 && (
-                <div>Jitter: {debugInfo.jitter.toFixed(3)}s</div>
-              )}
-              {debugInfo.latency !== null && (
-                <div>Latency: {debugInfo.latency.toFixed(2)}s</div>
-              )}
-            </div>
-            <div className="mt-2 pt-2 border-t border-white/20">
-              <div>Spawned: {debugInfo.spawnedTilesCount} / {debugInfo.patternTilesCount}</div>
-              <div>Active Tiles: {debugInfo.activeTilesCount}</div>
-              <div>Spawn Offset: {debugInfo.spawnOffset.toFixed(2)}s</div>
-              <div>First Tile Time: {debugInfo.firstTileTime.toFixed(2)}s</div>
-              <div>Next Tile: {debugInfo.nextTileToSpawn !== null ? debugInfo.nextTileToSpawn.toFixed(2) + 's' : 'None'}</div>
-              <div className={debugInfo.tilesSorted ? 'text-green-400' : 'text-red-400'}>
-                Tiles Sorted: {debugInfo.tilesSorted ? '✅ Yes' : '❌ No'}
-              </div>
-            </div>
-            {debugInfo.firstFewTiles.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-white/20">
-                <div className="font-semibold mb-1">First 10 Tiles:</div>
-                <div className="text-[10px] space-y-0.5 max-h-32 overflow-auto">
-                  {debugInfo.firstFewTiles.map((t, i) => (
-                    <div key={i}>
-                      {t.time.toFixed(2)}s - Lane {t.lane} - {t.type}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {spotifyTrack && (
-              <div className="mt-2 pt-2 border-t border-white/20">
-                <div>Track: {spotifyTrack.name}</div>
-                <div>Has Pattern: {spotifyPattern ? '✅ Yes' : '❌ No'}</div>
-              </div>
-            )}
-          </div>
-        </>
+        <HUD3D gameState={gameState} theme={theme} onPause={pauseGame} />
       )}
 
       {/* Upload Wizard */}
