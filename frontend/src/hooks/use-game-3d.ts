@@ -33,6 +33,10 @@ export interface GameState3D {
   gameOver: boolean
   gameTime: number
   lastHitFeedback: { lane: number; type: 'perfect' | 'good' | 'miss'; time: number } | null
+  // Accuracy tracking
+  perfectHits: number
+  goodHits: number
+  misses: number
 }
 
 const DEFAULT_SPEED = 15
@@ -107,7 +111,10 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     isPaused: false,
     gameOver: false,
     gameTime: 0,
-    lastHitFeedback: null
+    lastHitFeedback: null,
+    perfectHits: 0,
+    goodHits: 0,
+    misses: 0
   })
 
   // Track pressed keys for visual feedback on road
@@ -196,6 +203,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         return {
           ...prev,
           combo: 0,
+          misses: prev.misses + 1,
           lastHitFeedback: { lane, type: 'miss', time: Date.now() }
         }
       }
@@ -234,6 +242,8 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           score: prev.score + tapScore + bonusOnComplete,
           combo: isComplete ? prev.combo + 1 : prev.combo,
           maxCombo: isComplete ? Math.max(prev.maxCombo, prev.combo + 1) : prev.maxCombo,
+          perfectHits: isComplete && hitType === 'perfect' ? prev.perfectHits + 1 : prev.perfectHits,
+          goodHits: isComplete && hitType === 'good' ? prev.goodHits + 1 : prev.goodHits,
           lastHitFeedback: { lane, type: isComplete ? hitType : 'good', time: Date.now() }
         }
       }
@@ -270,6 +280,8 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         score: prev.score + scoreIncrease,
         combo: newCombo,
         maxCombo: Math.max(prev.maxCombo, newCombo),
+        perfectHits: hitType === 'perfect' ? prev.perfectHits + 1 : prev.perfectHits,
+        goodHits: hitType === 'good' ? prev.goodHits + 1 : prev.goodHits,
         lastHitFeedback: { lane, type: hitType, time: Date.now() }
       }
     })
@@ -306,6 +318,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           score: prev.score + scoreIncrease,
           combo: prev.combo + 1,
           maxCombo: Math.max(prev.maxCombo, prev.combo + 1),
+          perfectHits: prev.perfectHits + 1,
           lastHitFeedback: { lane, type: 'perfect', time: Date.now() }
         }
       } else {
@@ -314,6 +327,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           ...prev,
           tiles: newTiles,
           combo: 0,
+          misses: prev.misses + 1,
           lastHitFeedback: { lane, type: 'miss', time: Date.now() }
         }
       }
@@ -366,7 +380,10 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       isPaused: false,
       gameOver: false,
       gameTime: startTime,
-      lastHitFeedback: null
+      lastHitFeedback: null,
+      perfectHits: 0,
+      goodHits: 0,
+      misses: 0
     })
   }, [])
 
@@ -399,7 +416,10 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       isPaused: false,
       gameOver: false,
       gameTime: 0,
-      lastHitFeedback: null
+      lastHitFeedback: null,
+      perfectHits: 0,
+      goodHits: 0,
+      misses: 0
     })
     spawnedTilesRef.current = new Set()
     endlessTileIdRef.current = 0
@@ -622,8 +642,10 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         )
 
         let newCombo = prev.combo
+        let newMisses = prev.misses
         if (newlyMissed.length > 0) {
           newCombo = 0
+          newMisses = prev.misses + newlyMissed.length
         }
 
         if (currentMode === 'pattern' && currentPattern?.tiles && currentPattern.tiles.length > 0) {
@@ -644,6 +666,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
               ...prev,
               tiles: updatedTiles,
               combo: newCombo,
+              misses: newMisses,
               gameTime: newGameTime,
               isPlaying: false,
               gameOver: true
@@ -655,6 +678,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
           ...prev,
           tiles: updatedTiles,
           combo: newCombo,
+          misses: newMisses,
           gameTime: newGameTime
         }
       })
@@ -724,6 +748,13 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       window.removeEventListener('keyup', handleKeyUp)
     }
   }, [gameState.isPlaying, gameState.isPaused, hitTile, releaseTile, pauseGame])
+
+  // Calculate accuracy percentage
+  const calculateAccuracy = useCallback(() => {
+    const total = gameState.perfectHits + gameState.goodHits + gameState.misses
+    if (total === 0) return 100
+    return ((gameState.perfectHits + gameState.goodHits) / total) * 100
+  }, [gameState.perfectHits, gameState.goodHits, gameState.misses])
 
   // Debug info for UI
   const currentSpotifyPos = spotifyPositionRef.current
@@ -808,6 +839,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     audioRef,
     speed,
     pressedKeys,
-    debugInfo
+    debugInfo,
+    accuracy: calculateAccuracy()
   }
 }
