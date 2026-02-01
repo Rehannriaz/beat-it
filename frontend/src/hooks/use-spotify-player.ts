@@ -240,6 +240,21 @@ export function useSpotifyPlayer() {
 
         // Playback error
         player.addListener('playback_error', ({ message }: { message: string }) => {
+          // Ignore common errors that happen when Spotify isn't fully ready
+          // These are normal during initialization and don't need to be shown to user
+          const ignorableErrors = [
+            'Cannot perform operation; no list was loaded.',
+            'The operation is not allowed.',
+            'Cannot perform operation'
+          ]
+          
+          if (ignorableErrors.some(err => message.includes(err))) {
+            // Just log as warning, don't set error state
+            console.warn('Spotify playback warning (ignored):', message)
+            return
+          }
+          
+          // Only show real errors to user
           console.error('Spotify playback error:', message)
           setError(`Playback error: ${message}`)
         })

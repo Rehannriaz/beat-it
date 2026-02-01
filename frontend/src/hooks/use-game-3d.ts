@@ -130,6 +130,14 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
   const spotifyPositionRef = useRef(spotifyPosition)
   spotifyPositionRef.current = spotifyPosition
+  
+  // Track if we've synced with Spotify for the first time
+  const spotifySyncedRef = useRef(false)
+
+  // Throttling for button presses to prevent spam from slowing down animation
+  const lastHitTimeRef = useRef<Record<number, number>>({})
+  const pressedKeysRef = useRef<Set<number>>(new Set())
+  const MIN_HIT_INTERVAL = 50 // Minimum milliseconds between hits on the same lane
 
   useEffect(() => {
     if (audioUrl) {
@@ -146,6 +154,16 @@ export function useGame3D(options: UseGame3DOptions = {}) {
   }, [audioUrl])
 
   const hitTile = useCallback((lane: number) => {
+    const now = performance.now()
+    const lastHitTime = lastHitTimeRef.current[lane] || 0
+    
+    // Throttle: prevent rapid repeated hits on the same lane
+    if (now - lastHitTime < MIN_HIT_INTERVAL) {
+      return // Ignore this hit, too soon after the last one
+    }
+    
+    lastHitTimeRef.current[lane] = now
+
     setGameState(prev => {
       // Get current hit zone Z position (matches visual pink stripe)
       const currentHitZoneZ = hitZoneZ
@@ -209,8 +227,14 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     endlessTileIdRef.current = 0
     endlessSpawnTimerRef.current = 0
     lastTimeRef.current = performance.now()
+    // Reset throttling refs for clean state
+    lastHitTimeRef.current = {}
+    pressedKeysRef.current = new Set()
+    // Reset Spotify sync flag - important: don't sync until position is actually 0
+    spotifySyncedRef.current = false
 
     const currentPattern = patternRef.current
+    const isUsingSpotify = spotifyPositionRef.current !== undefined
     console.log('[Game] Starting game', {
       mode: modeRef.current,
       hasPattern: !!currentPattern,
@@ -219,9 +243,13 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       patternBpm: currentPattern?.metadata?.bpm ?? 0,
       firstTileTime: currentPattern?.tiles?.[0]?.time ?? 0,
       lastTileTime: currentPattern?.tiles?.[currentPattern?.tiles?.length - 1]?.time ?? 0,
-      audioUrl: audioRef.current?.src ?? 'none'
+      audioUrl: audioRef.current?.src ?? 'none',
+      isUsingSpotify,
+      spotifyPosition: spotifyPositionRef.current
     })
 
+    // Always start from spawn offset for pattern mode (tiles need time to spawn)
+    // When using Spotify, the position will sync once playback starts at position 0
     const startTime = modeRef.current === 'pattern' ? -spawnOffsetRef.current : 0
 
     if (audioRef.current) {
@@ -291,32 +319,57 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       lastTimeRef.current = timestamp
 
       setGameState(prev => {
-        let newGameTime = prev.gameTime + deltaTime
+        let newGameTime: number
+        let newTiles = [...prev.tiles]
 
-        // Handle audio playback start
-        if (audioRef.current) {
+        // Determine gameTime based on audio source
+        const currentSpotifyPosition = spotifyPositionRef.current
+        const isUsingSpotify = currentSpotifyPosition !== undefined
+        
+        if (isUsingSpotify) {
+          // Using Spotify - sync with position but smooth out updates
+          if (currentSpotifyPosition >= 0) {
+            // Spotify is playing
+            // Only sync if position is reasonable (not from previous track)
+            // If position is > 2 seconds, it's likely from a previous track - ignore it until it resets
+            if (currentSpotifyPosition <= 2 || !spotifySyncedRef.current) {
+              // First time syncing: only sync if position is very close to 0 (music just started)
+              if (!spotifySyncedRef.current) {
+                if (currentSpotifyPosition <= 0.5) {
+                  // Position is at start - safe to sync
+                  spotifySyncedRef.current = true
+                  newGameTime = currentSpotifyPosition
+                } else {
+                  // Position is too far - wait for it to reset to 0
+                  newGameTime = prev.gameTime + deltaTime
+                }
+              } else {
+                // Already synced - use position directly
+                newGameTime = currentSpotifyPosition
+              }
+            } else {
+              // Position seems wrong (from previous track) - keep incrementing
+              newGameTime = prev.gameTime + deltaTime
+            }
+          } else {
+            // Spotify not started yet - keep incrementing from startTime
+            newGameTime = prev.gameTime + deltaTime
+          }
+        } else if (audioRef.current && !audioRef.current.paused) {
+          // Using audio file - sync with audio currentTime
+          newGameTime = audioRef.current.currentTime
+        } else {
+          // No audio - increment normally
+          newGameTime = prev.gameTime + deltaTime
+        }
+
+        // Handle audio playback start (only for local audio files)
+        if (audioRef.current && !isUsingSpotify) {
           if (prev.gameTime < 0 && newGameTime >= 0) {
             audioRef.current.currentTime = 0
             audioRef.current.play().catch(console.error)
           }
         }
-
-        // Sync to audio/Spotify only occasionally to avoid jitter
-        // Only hard-sync when severely out of sync (> 1 second)
-        const currentSpotifyPosition = spotifyPositionRef.current
-        if (currentSpotifyPosition !== undefined && newGameTime >= 0) {
-          const drift = Math.abs(currentSpotifyPosition - newGameTime)
-          if (drift > 1.0) {
-            newGameTime = currentSpotifyPosition
-          }
-        } else if (audioRef.current && !audioRef.current.paused && newGameTime >= 0) {
-          const drift = Math.abs(audioRef.current.currentTime - newGameTime)
-          if (drift > 1.0) {
-            newGameTime = audioRef.current.currentTime
-          }
-        }
-
-        let newTiles = [...prev.tiles]
 
         const currentMode = modeRef.current
         const currentPattern = patternRef.current
@@ -325,29 +378,47 @@ export function useGame3D(options: UseGame3DOptions = {}) {
         const currentHitZoneZ = hitZoneZRef.current
 
         if (currentMode === 'pattern' && currentPattern?.tiles) {
-          for (const patternTile of currentPattern.tiles) {
-            const spawnTime = patternTile.time - currentSpawnOffset
+          // For Spotify: spawn tiles when synced and gameTime is valid
+          // Only restrict spawn in the first 0.5 seconds to avoid tiles from previous track
+          // After that, spawn normally based on gameTime
+          const canSpawnTiles = isUsingSpotify
+            ? (currentSpotifyPosition !== undefined && 
+               currentSpotifyPosition >= 0 && 
+               spotifySyncedRef.current &&
+               newGameTime >= -currentSpawnOffset &&
+               // Only restrict spawn in the very beginning (first 0.5s) to avoid previous track tiles
+               (currentSpotifyPosition >= 0.5 || currentSpotifyPosition < 0.5))
+            : (newGameTime >= -currentSpawnOffset)
+          
+          if (canSpawnTiles) {
+            for (const patternTile of currentPattern.tiles) {
+              const spawnTime = patternTile.time - currentSpawnOffset
 
-            if (spawnTime <= newGameTime && !spawnedTilesRef.current.has(patternTile.id)) {
-              spawnedTilesRef.current.add(patternTile.id)
+              // Only spawn if we haven't already spawned this tile
+              // AND the spawn time is reasonable (not too far in the past)
+              // Allow spawning tiles up to 2 seconds in the past to catch up
+              if (spawnTime <= newGameTime && 
+                  spawnTime >= newGameTime - 2.0 && // Allow catching up tiles up to 2s in the past
+                  !spawnedTilesRef.current.has(patternTile.id)) {
+                spawnedTilesRef.current.add(patternTile.id)
 
-              const timeUntilHit = patternTile.time - newGameTime
-              // Calculate ideal Z position relative to hit zone
-              // Tile should reach currentHitZoneZ at patternTile.time
-              const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
-              // Always use ideal position, but clamp to spawn distance if too far back
-              const initialZ = Math.max(SPAWN_DISTANCE, idealZ)
+                const timeUntilHit = patternTile.time - newGameTime
+                // Calculate ideal Z position relative to hit zone
+                const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
+                // Clamp to spawn distance if too far back
+                const initialZ = Math.max(SPAWN_DISTANCE, idealZ)
 
-              newTiles.push({
-                id: patternTile.id,
-                lane: patternTile.lane,
-                z: initialZ,
-                hit: false,
-                missed: false,
-                type: patternTile.type,
-                beatStrength: patternTile.beatStrength ?? 0.5,
-                targetTime: patternTile.time
-              })
+                newTiles.push({
+                  id: patternTile.id,
+                  lane: patternTile.lane,
+                  z: initialZ,
+                  hit: false,
+                  missed: false,
+                  type: patternTile.type,
+                  beatStrength: patternTile.beatStrength ?? 0.5,
+                  targetTime: patternTile.time
+                })
+              }
             }
           }
         } else {
@@ -385,26 +456,9 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
         const updatedTiles = newTiles
           .map(tile => {
-            // For pattern mode, always use precise time-based positioning
-            // This ensures tiles are always in the correct position relative to hit zone
-            if (currentMode === 'pattern' && currentPattern?.tiles) {
-              const patternTile = currentPattern.tiles.find(pt => pt.id === tile.id)
-              if (patternTile) {
-                const timeUntilHit = patternTile.time - newGameTime
-                // Calculate ideal Z position relative to hit zone
-                // Hit zone is at currentHitZoneZ, so tile should reach currentHitZoneZ at patternTile.time
-                const idealZ = currentHitZoneZ - (currentSpeed * timeUntilHit)
-                
-                // Always use precise positioning for pattern tiles
-                // This ensures perfect sync without any visible corrections
-                return {
-                  ...tile,
-                  z: idealZ
-                }
-              }
-            }
-            
-            // Default movement for endless mode
+            // Always use incremental movement for smooth animation
+            // This prevents jittery movement when gameTime updates in steps (like with Spotify)
+            // The initial spawn position is calculated correctly, then we just move forward smoothly
             return {
               ...tile,
               z: tile.z + currentSpeed * deltaTime
@@ -490,7 +544,14 @@ export function useGame3D(options: UseGame3DOptions = {}) {
 
       if (laneIndex !== -1) {
         e.preventDefault()
-        hitTile(laneIndex)
+        
+        // Prevent key repeat events from spamming hits
+        // Only process if this key wasn't already pressed
+        if (!pressedKeysRef.current.has(laneIndex)) {
+          pressedKeysRef.current.add(laneIndex)
+          hitTile(laneIndex)
+        }
+        
         // Track key press for visual feedback (continuous while key is held)
         setPressedKeys(prev => new Set(prev).add(laneIndex))
       }
@@ -500,6 +561,8 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       const key = e.key.toUpperCase()
       const laneIndex = LANE_KEYS.indexOf(key)
       if (laneIndex !== -1) {
+        // Remove from ref so the key can be pressed again
+        pressedKeysRef.current.delete(laneIndex)
         setPressedKeys(prev => {
           const next = new Set(prev)
           next.delete(laneIndex)
@@ -516,6 +579,30 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     }
   }, [gameState.isPlaying, gameState.isPaused, hitTile, pauseGame])
 
+  // Debug info for UI
+  const currentSpotifyPos = spotifyPositionRef.current
+  const isUsingSpotify = currentSpotifyPos !== undefined
+  const canSpawnDebug = isUsingSpotify
+    ? (currentSpotifyPos !== undefined && 
+       currentSpotifyPos >= 0 && 
+       spotifySyncedRef.current &&
+       gameState.gameTime >= -(pattern?.settings?.spawnOffset ?? DEFAULT_SPAWN_OFFSET))
+    : true
+  
+  const debugInfo = {
+    gameTime: gameState.gameTime,
+    spotifyPosition: currentSpotifyPos,
+    spotifySynced: spotifySyncedRef.current,
+    isUsingSpotify: isUsingSpotify,
+    spawnedTilesCount: spawnedTilesRef.current.size,
+    activeTilesCount: gameState.tiles.length,
+    patternTilesCount: pattern?.tiles?.length ?? 0,
+    canSpawn: canSpawnDebug,
+    spawnOffset: pattern?.settings?.spawnOffset ?? DEFAULT_SPAWN_OFFSET,
+    firstTileTime: pattern?.tiles?.[0]?.time ?? 0,
+    nextTileToSpawn: pattern?.tiles?.find(t => !spawnedTilesRef.current.has(t.id))?.time ?? null
+  }
+
   return {
     gameState,
     startGame,
@@ -526,6 +613,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     mode,
     audioRef,
     speed,
-    pressedKeys
+    pressedKeys,
+    debugInfo
   }
 }

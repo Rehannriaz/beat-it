@@ -9,9 +9,10 @@ interface SpotifyPlayerProps {
   trackUri?: string
   onPositionChange?: (position: number) => void
   isPaused?: boolean // External control for pause/resume
+  shouldReset?: boolean // When true, reset position to 0 when game starts
 }
 
-export function SpotifyPlayer({ trackUri, onPositionChange, isPaused: externalIsPaused }: SpotifyPlayerProps) {
+export function SpotifyPlayer({ trackUri, onPositionChange, isPaused: externalIsPaused, shouldReset }: SpotifyPlayerProps) {
   const {
     isReady,
     isPlaying,
@@ -39,15 +40,77 @@ export function SpotifyPlayer({ trackUri, onPositionChange, isPaused: externalIs
     }
   }, [position, onPositionChange])
 
-  // Play track when URI changes
+  // Track the last URI to detect changes
+  const lastUriRef = useRef<string | undefined>(undefined)
+  const lastShouldResetRef = useRef(false)
+  
+  // Reset position when shouldReset becomes true (game starts)
   useEffect(() => {
-    if (trackUri && isReady && currentTrack?.uri !== trackUri) {
-      console.log('Playing track:', trackUri)
-      play(trackUri).catch((err) => {
-        console.error('Failed to play track:', err)
+    if (shouldReset && !lastShouldResetRef.current && isReady && currentTrack) {
+      // Game just started - reset position to 0
+      console.log('Resetting Spotify position to 0 for game start')
+      seek(0).catch((err) => {
+        // Ignore errors if player isn't ready yet
+        if (!err.message?.includes('not ready') && !err.message?.includes('no list')) {
+          console.error('Failed to reset position:', err)
+        }
+      })
+      // Notify parent of reset
+      if (onPositionChange) {
+        onPositionChange(0)
+      }
+    }
+    lastShouldResetRef.current = shouldReset || false
+  }, [shouldReset, isReady, currentTrack, seek, onPositionChange])
+  
+  // Stop previous track when URI changes (even in menu)
+  useEffect(() => {
+    // If we have a current track playing and trackUri changes or becomes undefined, stop it
+    if (isReady && currentTrack && currentTrack.uri !== trackUri) {
+      // Different track or trackUri removed - stop current playback
+      pause().catch(() => {
+        // Ignore errors - track might already be stopped
       })
     }
-  }, [trackUri, isReady, play, currentTrack?.uri])
+  }, [trackUri, isReady, currentTrack, pause])
+  
+  // Play track when URI changes - but ONLY when game is playing (shouldReset is true)
+  useEffect(() => {
+    // Don't play if game is not started - we're still in menu
+    if (!trackUri || !isReady || !shouldReset) {
+      return
+    }
+    
+    // Only play if URI actually changed
+    if (lastUriRef.current === trackUri) return
+    if (currentTrack?.uri === trackUri) {
+      lastUriRef.current = trackUri
+      return
+    }
+    
+    console.log('Playing new track (game started):', trackUri)
+    lastUriRef.current = trackUri
+    
+    // First pause any current playback, then reset and play new track
+    pause()
+      .then(() => seek(0))
+      .then(() => {
+        // Small delay to ensure previous track is stopped
+        return new Promise(resolve => setTimeout(resolve, 100))
+      })
+      .then(() => {
+        // Play the track - Spotify will start from the beginning
+        return play(trackUri)
+      })
+      .catch((err) => {
+        // Ignore common errors that happen during transitions
+        if (!err.message?.includes('not ready') && 
+            !err.message?.includes('no list') &&
+            !err.message?.includes('not allowed')) {
+          console.error('Failed to play track:', err)
+        }
+      })
+  }, [trackUri, isReady, shouldReset, play, pause, seek, currentTrack?.uri])
 
   // Sync with external pause/resume control
   useEffect(() => {

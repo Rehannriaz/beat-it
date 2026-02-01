@@ -54,9 +54,20 @@ export function RhythmGame3D() {
   const { data: examplePattern, isLoading: patternLoading } = useExamplePattern()
 
   // Use spotify pattern, uploaded pattern, or example pattern (in priority order)
-  const activePattern = spotifyPattern || uploadedPattern || examplePattern
+  // BUT: if using Spotify, don't fall back to example pattern - only use spotifyPattern
+  const activePattern = spotifyTrack 
+    ? (spotifyPattern || null)  // Only use spotify pattern when using Spotify
+    : (uploadedPattern || examplePattern)  // Use uploaded or example for non-Spotify
 
-  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys } = useGame3D({
+  // Wrapper for startGame that resets Spotify position
+  const handleStartGame = () => {
+    if (spotifyTrack) {
+      setSpotifyPosition(0)
+    }
+    startGame()
+  }
+
+  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys, debugInfo } = useGame3D({
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
     audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
@@ -74,6 +85,8 @@ export function RhythmGame3D() {
   }
 
   const handleSpotifyComplete = (track: SpotifyTrack, pattern: GamePattern) => {
+    // Reset position when changing track
+    setSpotifyPosition(0)
     setSpotifyTrack(track)
     setSpotifyPattern(pattern)
     setUploadedPattern(null) // Clear uploaded if any
@@ -91,7 +104,29 @@ export function RhythmGame3D() {
 
       {/* HUD - only show when playing */}
       {gameState.isPlaying && !gameState.isPaused && (
-        <HUD3D gameState={gameState} theme={theme} onPause={pauseGame} />
+        <>
+          <HUD3D gameState={gameState} theme={theme} onPause={pauseGame} />
+          {/* Debug panel */}
+          <div className="absolute top-20 left-4 bg-black/90 text-white text-xs p-3 rounded font-mono z-50 max-w-sm overflow-auto max-h-96">
+            <div className="font-bold mb-2 text-yellow-400">Debug Info</div>
+            <div>GameTime: {debugInfo.gameTime.toFixed(2)}s</div>
+            <div>Spotify Pos: {debugInfo.spotifyPosition !== undefined ? debugInfo.spotifyPosition.toFixed(2) : 'N/A'}s</div>
+            <div>Spotify Synced: {debugInfo.spotifySynced ? '✅ Yes' : '❌ No'}</div>
+            <div>Using Spotify: {debugInfo.isUsingSpotify ? 'Yes' : 'No'}</div>
+            <div>Can Spawn: {debugInfo.canSpawn ? '✅ Yes' : '❌ No'}</div>
+            <div>Spawned: {debugInfo.spawnedTilesCount} / {debugInfo.patternTilesCount}</div>
+            <div>Active Tiles: {debugInfo.activeTilesCount}</div>
+            <div>Spawn Offset: {debugInfo.spawnOffset.toFixed(2)}s</div>
+            <div>First Tile Time: {debugInfo.firstTileTime.toFixed(2)}s</div>
+            <div>Next Tile: {debugInfo.nextTileToSpawn !== null ? debugInfo.nextTileToSpawn.toFixed(2) + 's' : 'None'}</div>
+            {spotifyTrack && (
+              <div className="mt-2 pt-2 border-t border-white/20">
+                <div>Track: {spotifyTrack.name}</div>
+                <div>Has Pattern: {spotifyPattern ? '✅ Yes' : '❌ No'}</div>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Upload Wizard */}
@@ -110,13 +145,14 @@ export function RhythmGame3D() {
         theme={theme}
       />
 
-      {/* Spotify player when playing Spotify track */}
-      {spotifyTrack && gameState.isPlaying && (
+      {/* Spotify player - only pass trackUri when game is playing to avoid auto-play in menu */}
+      {spotifyTrack && (
         <div className="hidden">
           <SpotifyPlayer
-            trackUri={spotifyTrack.uri}
+            trackUri={gameState.isPlaying ? spotifyTrack.uri : undefined}
             onPositionChange={setSpotifyPosition}
-            isPaused={gameState.isPaused}
+            isPaused={!gameState.isPlaying || gameState.isPaused}
+            shouldReset={gameState.isPlaying}
           />
         </div>
       )}
@@ -127,7 +163,7 @@ export function RhythmGame3D() {
           <StartScreen3D
             key="start"
             theme={theme}
-            onStart={startGame}
+            onStart={handleStartGame}
             onThemeChange={setTheme}
             pattern={activePattern}
             patternLoading={patternLoading}
@@ -152,7 +188,7 @@ export function RhythmGame3D() {
             key="gameover"
             gameState={gameState}
             theme={theme}
-            onRestart={startGame}
+            onRestart={handleStartGame}
             onMenu={endGame}
           />
         )}
