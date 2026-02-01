@@ -11,7 +11,25 @@
       "Skill(superpowers:writing-plans)",
       "Skill(superpowers:subagent-driven-development)",
       "Bash(curl:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it status --short)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it check-ignore -v frontend/.env.local.example)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it add frontend/src/lib/supabase.ts frontend/.env.local.example frontend/package.json frontend/package-lock.json frontend/.gitignore)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it log --oneline -5)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it diff --cached --stat)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it status)",
+      "Bash(git worktree:*)",
+      "Bash(cat:*)",
+      "Bash(git show:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npx:*)",
+      "Bash(git -C /Users/camilla/Desktop/beat-it log --oneline)",
+      "Skill(superpowers:systematic-debugging)"
     ]
   }
 }

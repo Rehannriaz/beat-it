@@ -14,6 +14,8 @@ const SCOPES = [
   'user-read-currently-playing',
   'streaming',
   'app-remote-control',
+  'playlist-read-public',
+  'playlist-read-private',
 ].join(' ');
 
 /**
