@@ -9,7 +9,8 @@
       "Bash(npm test:*)",
       "Bash(npm run build:*)",
       "Skill(superpowers:writing-plans)",
-      "Skill(superpowers:subagent-driven-development)"
+      "Skill(superpowers:subagent-driven-development)",
+      "Bash(curl:*)"
     ]
   }
 }
