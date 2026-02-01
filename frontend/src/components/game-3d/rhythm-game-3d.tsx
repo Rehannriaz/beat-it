@@ -10,6 +10,8 @@ import { ComboCelebration } from './combo-celebration'
 import { UploadWizard } from '@/components/upload-wizard'
 import { SpotifyWizard } from '@/components/spotify-wizard'
 import { SpotifyPlayer } from '@/components/spotify/spotify-player'
+import { ScoreSubmitModal } from '@/components/daily-challenge/score-submit-modal'
+import { getTodayUTC } from '@/lib/daily-challenge'
 import type { Theme } from '@/lib/game-types'
 import type { Song } from '@/types/api'
 import type { GamePattern } from '@/lib/pattern-types'
@@ -51,6 +53,9 @@ export function RhythmGame3D() {
   const [spotifyTrack, setSpotifyTrack] = useState<SpotifyTrack | null>(null)
   const [spotifyPattern, setSpotifyPattern] = useState<GamePattern | null>(null)
   const [spotifyPosition, setSpotifyPosition] = useState(0)
+  const [isDailyChallenge, setIsDailyChallenge] = useState(false)
+  const [dailyTrackId, setDailyTrackId] = useState<string | null>(null)
+  const [showScoreSubmit, setShowScoreSubmit] = useState(false)
 
   const { playHit, playComboMilestone, checkMilestone } = useGameSounds()
   const prevComboRef = useRef(0)
@@ -71,7 +76,7 @@ export function RhythmGame3D() {
     startGame()
   }
 
-  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys, debugInfo } = useGame3D({
+  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys, debugInfo, accuracy } = useGame3D({
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
     audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
@@ -114,6 +119,66 @@ export function RhythmGame3D() {
     setUsePattern(true)
     setSpotifyWizardOpen(false)
   }
+
+  const handleDailyPlay = async (trackId: string) => {
+    setIsDailyChallenge(true)
+    setDailyTrackId(trackId)
+
+    // Fetch the track from Spotify
+    const { spotifyApi } = await import('@/lib/spotify/api')
+    const track = await spotifyApi.getTrack(trackId)
+
+    // Generate pattern for this track using the same logic as useSpotifyPattern
+    const { transformSpotifyAnalysis, generateFeaturesFromTrack } = await import('@/lib/spotify/transform')
+    const { api } = await import('@/lib/api')
+
+    let features
+    try {
+      const analysis = await spotifyApi.getAudioAnalysis(trackId)
+      features = transformSpotifyAnalysis(analysis)
+    } catch {
+      // Audio Analysis API may be deprecated - fallback to basic features
+      let audioFeatures = null
+      try {
+        audioFeatures = await spotifyApi.getAudioFeatures(trackId)
+      } catch {
+        // Audio Features also unavailable, will use default tempo
+      }
+      features = generateFeaturesFromTrack(track.duration_ms, audioFeatures)
+    }
+
+    // Call backend to generate pattern
+    const response = await api.post<{ data: GamePattern }>(
+      '/spotify/generate-pattern',
+      {
+        trackId: track.id,
+        title: track.name,
+        artist: track.artists.map((a) => a.name).join(', '),
+        duration: track.duration_ms / 1000,
+        difficulty: 'medium',
+        features,
+      }
+    )
+    const pattern = response.data
+
+    // Set up like handleSpotifyComplete but for daily
+    setSpotifyPosition(0)
+    setSpotifyTrack(track)
+    setSpotifyPattern(pattern)
+    setUploadedPattern(null)
+    setUploadedSong(null)
+    setUsePattern(true)
+
+    // Start the game
+    startGame()
+  }
+
+  // Show score submit modal when daily challenge ends
+  useEffect(() => {
+    if (gameState.gameOver && isDailyChallenge && dailyTrackId) {
+      setShowScoreSubmit(true)
+    }
+  }, [gameState.gameOver, isDailyChallenge, dailyTrackId])
 
   return (
     <div className="w-full h-screen relative overflow-hidden">
@@ -216,6 +281,25 @@ export function RhythmGame3D() {
         </div>
       )}
 
+      {/* Score Submit Modal for Daily Challenge */}
+      {showScoreSubmit && dailyTrackId && (
+        <ScoreSubmitModal
+          isOpen={showScoreSubmit}
+          onClose={() => {
+            setShowScoreSubmit(false)
+            setIsDailyChallenge(false)
+          }}
+          score={gameState.score}
+          accuracy={accuracy}
+          maxCombo={gameState.maxCombo}
+          challengeDate={getTodayUTC()}
+          spotifyTrackId={dailyTrackId}
+          textColor={themeStyles[theme].textColor}
+          glowColor={themeStyles[theme].glowColor}
+          laneColors={themeStyles[theme].laneColors}
+        />
+      )}
+
       {/* Combo celebrations */}
       {gameState.isPlaying && !gameState.isPaused && (
         <ComboCelebration
@@ -238,6 +322,7 @@ export function RhythmGame3D() {
             onToggleMode={() => setUsePattern(prev => !prev)}
             onUploadClick={() => setUploadWizardOpen(true)}
             onSpotifyClick={() => setSpotifyWizardOpen(true)}
+            onDailyPlay={handleDailyPlay}
           />
         )}
 
