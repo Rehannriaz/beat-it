@@ -17,6 +17,7 @@ interface Scene3DProps {
   theme: Theme
   onTileHit?: (lane: number) => void
   speed?: number
+  pressedKeys?: Set<number>
 }
 
 const themeBackgrounds: Record<Theme, string> = {
@@ -260,7 +261,7 @@ function ResponsiveCamera() {
   return null
 }
 
-function SceneContent({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps) {
+function SceneContent({ gameState, theme, onTileHit, speed = 15, pressedKeys = new Set() }: Scene3DProps) {
   const colors = themeColors[theme]
   const { scene } = useThree()
 
@@ -322,8 +323,9 @@ function SceneContent({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps)
           theme={theme}
           speed={speed}
           isPlaying={gameState.isPlaying && !gameState.isPaused}
+          pressedKeys={pressedKeys}
         />
-      ), [theme, speed, gameState.isPlaying, gameState.isPaused])}
+      ), [theme, speed, gameState.isPlaying, gameState.isPaused, pressedKeys])}
       
       {/* Lane key labels */}
       <LaneKeyLabels theme={theme} />
@@ -348,7 +350,7 @@ function SceneContent({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps)
   )
 }
 
-export function Scene3D({ gameState, theme, onTileHit, speed = 15 }: Scene3DProps) {
+export function Scene3D({ gameState, theme, onTileHit, speed = 15, pressedKeys = new Set() }: Scene3DProps) {
   // Calculate initial camera settings based on viewport
   const [cameraSettings, setCameraSettings] = useState({
     fov: 65,
@@ -421,7 +423,7 @@ export function Scene3D({ gameState, theme, onTileHit, speed = 15 }: Scene3DProp
       }}
       dpr={[1, 2]}
     >
-      <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} speed={speed} />
+      <SceneContent gameState={gameState} theme={theme} onTileHit={onTileHit} speed={speed} pressedKeys={pressedKeys} />
     </Canvas>
   )
 }

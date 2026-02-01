@@ -29,14 +29,15 @@ export function HitEffect({ lane, type, theme, time }: HitEffectProps) {
   const laneX = -4.5 + lane * 3
 
   useEffect(() => {
-    const timeout = setTimeout(() => setVisible(false), 500)
+    // Keep effect visible longer for better feedback
+    const timeout = setTimeout(() => setVisible(false), 800)
     return () => clearTimeout(timeout)
   }, [time])
 
   useFrame((_, delta) => {
-    if (scale < 3) {
-      setScale(prev => prev + delta * 8)
-      setOpacity(prev => Math.max(0, prev - delta * 3))
+    if (scale < 4) {
+      setScale(prev => prev + delta * 6)
+      setOpacity(prev => Math.max(0, prev - delta * 2))
     }
   })
 

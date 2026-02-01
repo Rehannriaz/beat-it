@@ -56,7 +56,7 @@ export function RhythmGame3D() {
   // Use spotify pattern, uploaded pattern, or example pattern (in priority order)
   const activePattern = spotifyPattern || uploadedPattern || examplePattern
 
-  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed } = useGame3D({
+  const { gameState, startGame, pauseGame, endGame, hitTile, mode, speed, pressedKeys } = useGame3D({
     pattern: usePattern ? activePattern : null,
     mode: usePattern ? 'pattern' : 'endless',
     audioUrl: spotifyTrack ? null : (uploadedSong?.fileUrl ?? null),
@@ -85,7 +85,7 @@ export function RhythmGame3D() {
     <div className="w-full h-screen relative overflow-hidden">
       {/* 3D Scene - tiles are clickable */}
       <Suspense fallback={<LoadingScreen theme={theme} />}>
-        <Scene3D gameState={gameState} theme={theme} onTileHit={hitTile} speed={speed} />
+        <Scene3D gameState={gameState} theme={theme} onTileHit={hitTile} speed={speed} pressedKeys={pressedKeys} />
       </Suspense>
 
       {/* HUD - only show when playing */}

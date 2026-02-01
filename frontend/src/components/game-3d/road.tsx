@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useMemo, memo } from 'react'
+import { useRef, useMemo, memo, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Mesh, Group } from 'three'
@@ -48,6 +48,7 @@ interface RoadProps {
   theme: Theme
   speed?: number
   isPlaying?: boolean
+  pressedKeys?: Set<number>
 }
 
 const themeColors: Record<Theme, { road: string; lines: string; glow: string; accent: string }> = {
@@ -62,11 +63,28 @@ const SEGMENT_LENGTH = 30
 const NUM_SEGMENTS = 4
 const ROAD_LENGTH = SEGMENT_LENGTH * NUM_SEGMENTS
 
-export const Road = memo(function Road({ theme, speed = 15, isPlaying = false }: RoadProps) {
+export const Road = memo(function Road({ theme, speed = 15, isPlaying = false, pressedKeys = new Set() }: RoadProps) {
   const colors = themeColors[theme]
   const hitZoneRef = useRef<Mesh>(null)
   const roadGroupRef = useRef<Group>(null)
   const scale = useResponsiveScale()
+  
+  // Refs for lane dividers to animate when keys are pressed (pop effect)
+  const laneDividerRefs = useRef<Array<Array<Mesh | null>>>([])
+  
+  // Refs for lane floor sections to animate when keys are pressed (pop effect)
+  const laneFloorRefs = useRef<Array<Array<Mesh | null>>>([])
+  
+  // Initialize lane divider refs (3 dividers between 4 lanes, multiple segments)
+  useEffect(() => {
+    laneDividerRefs.current = Array.from({ length: 3 }, () => 
+      Array.from({ length: NUM_SEGMENTS }, () => null)
+    )
+    // Initialize lane floor refs (4 lanes, multiple segments)
+    laneFloorRefs.current = Array.from({ length: 4 }, () => 
+      Array.from({ length: NUM_SEGMENTS }, () => null)
+    )
+  }, [])
 
   // Smooth fade function for back end (spawn area)
   const getFadeOpacity = useMemo(() => {
@@ -90,11 +108,157 @@ export const Road = memo(function Road({ theme, speed = 15, isPlaying = false }:
     }
   }, [])
 
-  // Animate hit zone glow and move road like a treadmill
+  // Animate hit zone glow, lane pop effects, and move road like a treadmill
   useFrame((state, delta) => {
     if (hitZoneRef.current) {
       const material = hitZoneRef.current.material as THREE.MeshStandardMaterial
       material.emissiveIntensity = 0.8 + Math.sin(state.clock.elapsedTime * 3) * 0.4
+    }
+
+    // Animate lane dividers and floor sections when keys are pressed (smooth pop effect)
+    // Lane 0 (D) affects divider 0 (left), Lane 1 (F) affects divider 0 and 1, etc.
+    pressedKeys.forEach((laneIndex) => {
+      // Animate floor section for this lane
+      const floorRefs = laneFloorRefs.current[laneIndex]
+      if (floorRefs) {
+        floorRefs.forEach((meshRef) => {
+          if (meshRef) {
+          // Pop effect: slight scale up and increase glow
+          const targetScale = 1.08
+          const currentScale = meshRef.scale.x
+          const newScale = THREE.MathUtils.lerp(currentScale, targetScale, delta * 25)
+          meshRef.scale.set(newScale, newScale, newScale)
+          
+          // Get lane color for glow
+          const laneColors = [
+            '#ff71ce', // D - pink
+            '#01cdfe', // F - cyan
+            '#05ffa1', // J - green
+            '#b967ff'  // K - purple
+          ]
+          const laneColor = laneColors[laneIndex] || colors.glow
+          
+          // Increase emissive intensity smoothly (more transparent)
+          if (meshRef.material instanceof THREE.MeshStandardMaterial) {
+            meshRef.material.emissive.setStyle(laneColor)
+            meshRef.material.emissiveIntensity = THREE.MathUtils.lerp(
+              meshRef.material.emissiveIntensity || 0.0,
+              0.15,
+              delta * 25
+            )
+          }
+          }
+        })
+      }
+      
+      // Each lane affects the dividers on its sides
+      const dividerIndices: number[] = []
+      if (laneIndex === 0) dividerIndices.push(0) // Left lane affects left divider
+      if (laneIndex === 1) dividerIndices.push(0, 1) // Second lane affects both dividers
+      if (laneIndex === 2) dividerIndices.push(1, 2) // Third lane affects both dividers
+      if (laneIndex === 3) dividerIndices.push(2) // Right lane affects right divider
+      
+      // Get lane color for better visual feedback
+      const laneColors = [
+        '#ff71ce', // D - pink
+        '#01cdfe', // F - cyan
+        '#05ffa1', // J - green
+        '#b967ff'  // K - purple
+      ]
+      const laneColor = laneColors[laneIndex] || colors.lines
+      
+      dividerIndices.forEach((dividerIndex) => {
+        const dividerRefs = laneDividerRefs.current[dividerIndex]
+        if (dividerRefs && dividerRefs.length > 0) {
+          dividerRefs.forEach((meshRef) => {
+            if (meshRef) {
+              // Smooth pop effect: slight scale increase
+              const targetScale = 1.2
+              const currentScale = meshRef.scale.x
+              const newScale = THREE.MathUtils.lerp(currentScale, targetScale, delta * 25)
+              meshRef.scale.set(newScale, newScale, newScale)
+              
+              // Smooth color transition to lane color with enhanced glow
+              if (meshRef.material instanceof THREE.MeshStandardMaterial) {
+                // Blend between current color and lane color
+                const targetColor = new THREE.Color(laneColor)
+                meshRef.material.color.lerp(targetColor, delta * 20)
+                
+                // Increase emissive intensity smoothly
+                meshRef.material.emissive.copy(meshRef.material.color)
+                meshRef.material.emissiveIntensity = THREE.MathUtils.lerp(
+                  meshRef.material.emissiveIntensity || 0.6,
+                  1.8,
+                  delta * 25
+                )
+              }
+            }
+          })
+        }
+      })
+    })
+
+    // Reset floor sections that are not pressed
+    for (let laneIndex = 0; laneIndex < 4; laneIndex++) {
+      if (!pressedKeys.has(laneIndex)) {
+        const floorRefs = laneFloorRefs.current[laneIndex]
+        if (floorRefs) {
+          floorRefs.forEach((meshRef) => {
+            if (meshRef) {
+              // Return to normal scale smoothly
+              const currentScale = meshRef.scale.x
+              const newScale = THREE.MathUtils.lerp(currentScale, 1.0, delta * 18)
+              meshRef.scale.set(newScale, newScale, newScale)
+              
+              // Return to normal glow (no glow)
+              if (meshRef.material instanceof THREE.MeshStandardMaterial) {
+                meshRef.material.emissiveIntensity = THREE.MathUtils.lerp(
+                  meshRef.material.emissiveIntensity || 0.0,
+                  0.0,
+                  delta * 18
+                )
+              }
+            }
+          })
+        }
+      }
+    }
+
+    // Reset dividers that are not affected by pressed keys
+    for (let dividerIndex = 0; dividerIndex < 3; dividerIndex++) {
+      const isAffected = Array.from(pressedKeys).some((laneIndex) => {
+        if (laneIndex === 0) return dividerIndex === 0
+        if (laneIndex === 1) return dividerIndex === 0 || dividerIndex === 1
+        if (laneIndex === 2) return dividerIndex === 1 || dividerIndex === 2
+        if (laneIndex === 3) return dividerIndex === 2
+        return false
+      })
+      
+      if (!isAffected) {
+        laneDividerRefs.current[dividerIndex]?.forEach((meshRef) => {
+          if (meshRef) {
+            // Return to normal scale smoothly
+            const currentScale = meshRef.scale.x
+            const newScale = THREE.MathUtils.lerp(currentScale, 1.0, delta * 18)
+            meshRef.scale.set(newScale, newScale, newScale)
+            
+            // Return to original color and normal glow
+            if (meshRef.material instanceof THREE.MeshStandardMaterial) {
+              // Return to original color
+              const originalColor = new THREE.Color(colors.lines)
+              meshRef.material.color.lerp(originalColor, delta * 18)
+              
+              // Return to normal glow
+              meshRef.material.emissive.copy(meshRef.material.color)
+              meshRef.material.emissiveIntensity = THREE.MathUtils.lerp(
+                meshRef.material.emissiveIntensity || 0.6,
+                0.6,
+                delta * 18
+              )
+            }
+          }
+        })
+      }
     }
 
     // Move road forward (treadmill effect)
@@ -162,11 +326,44 @@ export const Road = memo(function Road({ theme, speed = 15, isPlaying = false }:
           </mesh>
         ))}
 
-        {/* Lane dividers - glowing lines */}
+        {/* Lane floor sections - individual sections that can pop when keys are pressed */}
+        {roadSegments.map((segment, j) => {
+          const laneWidth = 3
+          const lanePositions = [-4.5, -1.5, 1.5, 4.5]
+          
+          return lanePositions.map((x, laneIndex) => (
+            <mesh
+              key={`lane-floor-${laneIndex}-${j}`}
+              ref={(el) => {
+                if (laneFloorRefs.current[laneIndex]) {
+                  laneFloorRefs.current[laneIndex][j] = el
+                }
+              }}
+              rotation={[-Math.PI / 2, 0, 0]}
+              position={[x, -0.49, segment.z]}
+            >
+              <planeGeometry args={[laneWidth - 0.2, SEGMENT_LENGTH]} />
+              <meshStandardMaterial
+                color={colors.road}
+                emissive={colors.road}
+                emissiveIntensity={0.0}
+                roughness={0.7}
+                metalness={0.3}
+              />
+            </mesh>
+          ))
+        })}
+
+        {/* Lane dividers - glowing lines with pop effect */}
         {[-3, 0, 3].map((x, i) => (
           roadSegments.map((segment, j) => (
             <mesh
               key={`divider-${i}-${j}`}
+              ref={(el) => {
+                if (laneDividerRefs.current[i]) {
+                  laneDividerRefs.current[i][j] = el
+                }
+              }}
               rotation={[-Math.PI / 2, 0, 0]}
               position={[x, -0.48, segment.z]}
             >

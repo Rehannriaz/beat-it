@@ -102,6 +102,9 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     lastHitFeedback: null
   })
 
+  // Track pressed keys for visual feedback on road
+  const [pressedKeys, setPressedKeys] = useState<Set<number>>(new Set())
+
   const animationFrameRef = useRef<number | undefined>(undefined)
   const lastTimeRef = useRef<number>(0)
   const spawnedTilesRef = useRef<Set<string>>(new Set())
@@ -488,11 +491,29 @@ export function useGame3D(options: UseGame3DOptions = {}) {
       if (laneIndex !== -1) {
         e.preventDefault()
         hitTile(laneIndex)
+        // Track key press for visual feedback (continuous while key is held)
+        setPressedKeys(prev => new Set(prev).add(laneIndex))
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const key = e.key.toUpperCase()
+      const laneIndex = LANE_KEYS.indexOf(key)
+      if (laneIndex !== -1) {
+        setPressedKeys(prev => {
+          const next = new Set(prev)
+          next.delete(laneIndex)
+          return next
+        })
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
   }, [gameState.isPlaying, gameState.isPaused, hitTile, pauseGame])
 
   return {
@@ -504,6 +525,7 @@ export function useGame3D(options: UseGame3DOptions = {}) {
     pattern,
     mode,
     audioRef,
-    speed
+    speed,
+    pressedKeys
   }
 }
