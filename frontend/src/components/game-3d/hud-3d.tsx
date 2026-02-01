@@ -162,11 +162,11 @@ export function HUD3D({ gameState, theme, onPause }: HUD3DProps) {
         )}
       </AnimatePresence>
 
-      {/* Hit feedback */}
+      {/* Hit feedback - auto-hides after 2s */}
       <AnimatePresence>
-        {gameState.lastHitFeedback && (
+        {visibleHitFeedback && (
           <motion.div
-            key={gameState.lastHitFeedback.time}
+            key={visibleHitFeedback.time}
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.5, opacity: 0 }}
@@ -176,19 +176,19 @@ export function HUD3D({ gameState, theme, onPause }: HUD3DProps) {
             <p
               className="text-lg sm:text-xl font-bold uppercase"
               style={{
-                color: gameState.lastHitFeedback.type === 'miss' 
-                  ? '#ff4444' 
-                  : gameState.lastHitFeedback.type === 'perfect'
+                color: visibleHitFeedback.type === 'miss'
+                  ? '#ff4444'
+                  : visibleHitFeedback.type === 'perfect'
                     ? '#00ff88'
                     : styles.textColor,
-                textShadow: gameState.lastHitFeedback.type === 'perfect'
+                textShadow: visibleHitFeedback.type === 'perfect'
                   ? '0 0 20px #00ff88'
                   : undefined
               }}
             >
-              {gameState.lastHitFeedback.type === 'perfect' && 'PERFECT!'}
-              {gameState.lastHitFeedback.type === 'good' && 'GOOD'}
-              {gameState.lastHitFeedback.type === 'miss' && 'MISS'}
+              {visibleHitFeedback.type === 'perfect' && 'PERFECT!'}
+              {visibleHitFeedback.type === 'good' && 'GOOD'}
+              {visibleHitFeedback.type === 'miss' && 'MISS'}
             </p>
           </motion.div>
         )}
