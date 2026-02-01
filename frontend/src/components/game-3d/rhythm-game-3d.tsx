@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, Suspense, useRef, useEffect } from 'react'
-import { AnimatePresence } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import dynamic from 'next/dynamic'
-import { useGame3D, useExamplePattern, useGameSounds } from '@/hooks'
+import { useGame3D, useExamplePattern, useGameSounds, useAuth } from '@/hooks'
 import { HUD3D } from './hud-3d'
 import { StartScreen3D, PauseScreen3D, GameOverScreen3D } from './overlays-3d'
 import { ComboCelebration } from './combo-celebration'
@@ -11,12 +11,14 @@ import { UploadWizard } from '@/components/upload-wizard'
 import { SpotifyWizard } from '@/components/spotify-wizard'
 import { SpotifyPlayer } from '@/components/spotify/spotify-player'
 import { ScoreSubmitModal } from '@/components/daily-challenge/score-submit-modal'
+import { AuthModal } from '@/components/auth/auth-modal'
 import { getTodayUTC } from '@/lib/daily-challenge'
 import type { Theme } from '@/lib/game-types'
 import type { Song } from '@/types/api'
 import type { GamePattern } from '@/lib/pattern-types'
 import type { SpotifyTrack } from '@/lib/spotify/types'
 import { themeStyles } from '@/lib/game-types'
+import { User, LogOut } from 'lucide-react'
 
 // Dynamically import Scene3D to avoid SSR issues with Three.js
 const Scene3D = dynamic(
@@ -57,7 +59,9 @@ export function RhythmGame3D() {
   const [dailyTrackId, setDailyTrackId] = useState<string | null>(null)
   const [showScoreSubmit, setShowScoreSubmit] = useState(false)
   const [dailyError, setDailyError] = useState<string | null>(null)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
 
+  const { user, profile, signOut, isAuthenticated, loading: authLoading } = useAuth()
   const { playHit, playComboMilestone, checkMilestone } = useGameSounds()
   const prevComboRef = useRef(0)
 
@@ -190,8 +194,97 @@ export function RhythmGame3D() {
     }
   }, [gameState.gameOver, isDailyChallenge, dailyTrackId])
 
+  const styles = themeStyles[theme]
+
   return (
     <div className="w-full h-screen relative overflow-hidden">
+      {/* Auth Button - Top Right */}
+      {!gameState.isPlaying && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-4 right-4 z-30"
+        >
+          {authLoading ? (
+            <div
+              className="px-4 py-2 rounded-lg"
+              style={{ background: 'rgba(0,0,0,0.5)' }}
+            >
+              <div
+                className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+                style={{ borderColor: styles.glowColor, borderTopColor: 'transparent' }}
+              />
+            </div>
+          ) : isAuthenticated ? (
+            <div
+              className="flex items-center gap-3 px-4 py-2 rounded-lg"
+              style={{
+                background: 'rgba(0,0,0,0.6)',
+                border: `1px solid ${styles.glowColor}40`,
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: `${styles.glowColor}30` }}
+                >
+                  <User className="w-4 h-4" style={{ color: styles.glowColor }} />
+                </div>
+                <span
+                  className="text-sm font-medium max-w-[120px] truncate"
+                  style={{ color: styles.textColor }}
+                >
+                  {profile?.display_name || user?.email?.split('@')[0] || 'User'}
+                </span>
+              </div>
+              <button
+                onClick={() => signOut()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                         transition-all duration-200 cursor-pointer hover:opacity-80"
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  color: styles.textColor,
+                }}
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setAuthModalOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium
+                       transition-all duration-200 cursor-pointer"
+              style={{
+                background: styles.glowColor,
+                color: '#000',
+                boxShadow: `0 0 20px ${styles.glowColor}60`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.05)'
+                e.currentTarget.style.boxShadow = `0 0 30px ${styles.glowColor}`
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)'
+                e.currentTarget.style.boxShadow = `0 0 20px ${styles.glowColor}60`
+              }}
+            >
+              <User className="w-4 h-4" />
+              Sign In
+            </button>
+          )}
+        </motion.div>
+      )}
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        onSuccess={() => setAuthModalOpen(false)}
+        textColor={styles.textColor}
+        glowColor={styles.glowColor}
+      />
+
       {/* 3D Scene - tiles are clickable */}
       <Suspense fallback={<LoadingScreen theme={theme} />}>
         <Scene3D gameState={gameState} theme={theme} onTileHit={hitTile} speed={speed} pressedKeys={pressedKeys} />
