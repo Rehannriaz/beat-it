@@ -153,6 +153,18 @@ export function Road({ theme }: RoadProps) {
             opacity={0.7}
           />
         </mesh>
+        {/* Top face - more transparent, horizontal plane on top of stripe */}
+        <mesh position={[0, 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[12, 1.8]} />
+          <meshStandardMaterial 
+            color={colors.glow}
+            emissive={colors.glow}
+            emissiveIntensity={1.5}
+            transparent
+            opacity={0.3}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
         {/* Top glow edge */}
         <mesh position={[0, 0.3, 0]}>
           <boxGeometry args={[12, 0.05, 1.8]} />

@@ -81,13 +81,25 @@ function LaneKeyLabels({ theme }: { theme: Theme }) {
     return -1.0
   }
   
-  // Responsive font size based on screen width
+  // Responsive font size based on screen width - larger on vertical screens
   const getFontSize = () => {
     const width = size.width
-    if (width < 640) return 0.6 * scale // Much smaller on mobile
-    if (width < 1024) return 0.9
-    if (width >= 1920) return 1.2 // Larger on big screens
-    return 1.0
+    const height = size.height
+    const isPortrait = height > width
+    
+    // Base size
+    let baseSize = 1.0
+    if (width < 640) baseSize = 0.7 * scale
+    else if (width < 1024) baseSize = 0.9
+    else if (width >= 1920) baseSize = 1.2
+    else baseSize = 1.0
+    
+    // Increase size on vertical screens for better visibility
+    if (isPortrait) {
+      baseSize *= 1.3
+    }
+    
+    return baseSize
   }
   
   const fontSize = getFontSize()
@@ -99,15 +111,23 @@ function LaneKeyLabels({ theme }: { theme: Theme }) {
         // Apply scale to lane positions
         const baseLaneX = -4.5 + i * 3
         const laneX = baseLaneX * scale
+        // Position letters on top face of pink stripe
+        // Stripe top is at Y = -0.5 (group) + 0.3 (top of bar) = -0.2
+        // Position slightly above (Y = -0.15) - just a little elevation
+        const letterY = -0.15
+        
         return (
           <Text
             key={key}
-            position={[laneX, 0.1, hitZoneZ]}
+            position={[laneX, letterY, hitZoneZ]}
             rotation={[-Math.PI / 2, 0, 0]}
-            fontSize={fontSize}
-            color={colors.primary}
+            fontSize={fontSize * 1.2}
+            color="#000000"
             anchorX="center"
             anchorY="middle"
+            fontWeight="900"
+            outlineWidth={fontSize * 0.02}
+            outlineColor="#ffffff"
           >
             {key}
           </Text>
