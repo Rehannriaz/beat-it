@@ -229,6 +229,7 @@ export function RhythmGame3D() {
             theme={theme}
             onRestart={handleStartGame}
             onMenu={endGame}
+            spotifyTrack={spotifyTrack}
           />
         )}
       </AnimatePresence>
