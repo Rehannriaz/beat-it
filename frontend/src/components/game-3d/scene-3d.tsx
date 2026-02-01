@@ -261,6 +261,25 @@ function ResponsiveCamera() {
 
 function SceneContent({ gameState, theme, onTileHit }: Scene3DProps) {
   const colors = themeColors[theme]
+  const { scene } = useThree()
+
+  // Add fog effect to hide tile spawning in the distance
+  useEffect(() => {
+    // Using linear fog for better control
+    // near: where fog starts (closer to camera = more visible fog)
+    // far: where fog is completely opaque (hides spawn point at -70)
+    // Tiles spawn at Z = -70, so fog should be fully opaque before that
+    const fog = new THREE.Fog(
+      themeBackgrounds[theme],
+      -30,  // Fog starts becoming visible at -30
+      -65   // Fog is completely opaque at -65 (just before spawn at -70)
+    )
+    scene.fog = fog
+
+    return () => {
+      scene.fog = null
+    }
+  }, [scene, theme])
 
   return (
     <>

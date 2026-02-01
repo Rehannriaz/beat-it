@@ -68,72 +68,152 @@ export function Road({ theme }: RoadProps) {
     }
   })
 
+  // Helper function to calculate fade opacity based on Z position
+  // Tiles spawn at z = -70, so we fade gradually from z = -30 to z = -80
+  const getFadeOpacity = (z: number): number => {
+    const fadeStart = -30  // Start fading much earlier for smoother effect
+    const fadeEnd = -80    // Fully transparent well past spawn point at -70
+    
+    if (z > fadeStart) return 1.0  // Full opacity near camera
+    if (z < fadeEnd) return 0.0    // Fully transparent at far end
+    
+    // Very gradual fade using smoothstep for ultra-smooth transition
+    const fadeRange = fadeStart - fadeEnd
+    const distanceFromStart = fadeStart - z
+    const fadeProgress = distanceFromStart / fadeRange
+    // Smoothstep for very smooth fade
+    const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
+    // Apply easing for even smoother fade
+    const easedFade = smoothFade * smoothFade * (3 - 2 * smoothFade)
+    return Math.max(0, 1.0 - easedFade)
+  }
+
   // Use consistent scale for all geometry - only scale X and Z, not Y
   return (
     <group scale={[scale, scale, scale]}>
-      {/* Main road surface with subtle reflection */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, -40]} receiveShadow>
-        <planeGeometry args={[12, 100]} />
-        <meshStandardMaterial 
-          color={colors.road}
-          roughness={0.7}
-          metalness={0.3}
-        />
-      </mesh>
+      {/* Main road surface with subtle reflection - segmented for smooth fade */}
+      {Array.from({ length: 30 }).map((_, i) => {
+        const segmentZ = -40 + (i - 15) * 3.33  // Center at -40, segments every ~3.33 units
+        const opacity = getFadeOpacity(segmentZ)
+        if (opacity <= 0) return null
+        return (
+          <mesh 
+            key={`road-${i}`}
+            rotation={[-Math.PI / 2, 0, 0]} 
+            position={[0, -0.5, segmentZ]} 
+            receiveShadow
+          >
+            <planeGeometry args={[12, 3.33]} />
+            <meshStandardMaterial 
+              color={colors.road}
+              roughness={0.7}
+              metalness={0.3}
+              transparent
+              opacity={opacity}
+            />
+          </mesh>
+        )
+      })}
 
-      {/* Lane dividers - glowing lines */}
+      {/* Lane dividers - glowing lines with fade */}
       {[-3, 0, 3].map((x, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, 0, 0]} position={[x, -0.48, -40]}>
-          <planeGeometry args={[0.1, 100]} />
-          <meshStandardMaterial 
-            color={colors.lines}
-            emissive={colors.lines}
-            emissiveIntensity={0.6}
-          />
-        </mesh>
+        Array.from({ length: 30 }).map((_, j) => {
+          const segmentZ = -40 + (j - 15) * 3.33
+          const opacity = getFadeOpacity(segmentZ)
+          if (opacity <= 0) return null
+          return (
+            <mesh 
+              key={`divider-${i}-${j}`}
+              rotation={[-Math.PI / 2, 0, 0]} 
+              position={[x, -0.48, segmentZ]}
+            >
+              <planeGeometry args={[0.1, 3.33]} />
+              <meshStandardMaterial 
+                color={colors.lines}
+                emissive={colors.lines}
+                emissiveIntensity={0.6}
+                transparent
+                opacity={opacity}
+              />
+            </mesh>
+          )
+        })
       ))}
 
-      {/* Side borders - thick glowing rails */}
+      {/* Side borders - thick glowing rails with fade */}
       {[-6.2, 6.2].map((x, i) => (
         <group key={i}>
           {/* Main border line */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x, -0.4, -40]}>
-            <planeGeometry args={[0.3, 100]} />
-            <meshStandardMaterial 
-              color={colors.glow}
-              emissive={colors.glow}
-              emissiveIntensity={1.2}
-            />
-          </mesh>
+          {Array.from({ length: 30 }).map((_, j) => {
+            const segmentZ = -40 + (j - 15) * 3.33
+            const opacity = getFadeOpacity(segmentZ)
+            if (opacity <= 0) return null
+            return (
+              <mesh 
+                key={`border-${i}-${j}`}
+                rotation={[-Math.PI / 2, 0, 0]} 
+                position={[x, -0.4, segmentZ]}
+              >
+                <planeGeometry args={[0.3, 3.33]} />
+                <meshStandardMaterial 
+                  color={colors.glow}
+                  emissive={colors.glow}
+                  emissiveIntensity={1.2}
+                  transparent
+                  opacity={opacity}
+                />
+              </mesh>
+            )
+          })}
           {/* Outer accent line */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[x + (i === 0 ? -0.25 : 0.25), -0.42, -40]}>
-            <planeGeometry args={[0.1, 100]} />
-            <meshStandardMaterial 
-              color={colors.accent}
-              emissive={colors.accent}
-              emissiveIntensity={0.8}
-            />
-          </mesh>
+          {Array.from({ length: 30 }).map((_, j) => {
+            const segmentZ = -40 + (j - 15) * 3.33
+            const opacity = getFadeOpacity(segmentZ)
+            if (opacity <= 0) return null
+            return (
+              <mesh 
+                key={`accent-${i}-${j}`}
+                rotation={[-Math.PI / 2, 0, 0]} 
+                position={[x + (i === 0 ? -0.25 : 0.25), -0.42, segmentZ]}
+              >
+                <planeGeometry args={[0.1, 3.33]} />
+                <meshStandardMaterial 
+                  color={colors.accent}
+                  emissive={colors.accent}
+                  emissiveIntensity={0.8}
+                  transparent
+                  opacity={opacity}
+                />
+              </mesh>
+            )
+          })}
         </group>
       ))}
 
-      {/* Perspective grid lines */}
-      {Array.from({ length: 30 }).map((_, i) => (
-        <mesh 
-          key={i} 
-          rotation={[-Math.PI / 2, 0, 0]} 
-          position={[0, -0.47, -i * 3.5]}
-        >
-          <planeGeometry args={[12, 0.04]} />
-          <meshStandardMaterial 
-            color={colors.lines}
-            emissive={colors.lines}
-            emissiveIntensity={0.2}
-            transparent
-            opacity={Math.max(0.1, 0.5 - i * 0.015)}
-          />
-        </mesh>
-      ))}
+      {/* Perspective grid lines with enhanced fade */}
+      {Array.from({ length: 30 }).map((_, i) => {
+        const z = -i * 3.5
+        const baseOpacity = Math.max(0.1, 0.5 - i * 0.015)
+        const pathFadeOpacity = getFadeOpacity(z)
+        const finalOpacity = Math.min(baseOpacity, pathFadeOpacity)
+        if (finalOpacity <= 0) return null
+        return (
+          <mesh 
+            key={i} 
+            rotation={[-Math.PI / 2, 0, 0]} 
+            position={[0, -0.47, z]}
+          >
+            <planeGeometry args={[12, 0.04]} />
+            <meshStandardMaterial 
+              color={colors.lines}
+              emissive={colors.lines}
+              emissiveIntensity={0.2}
+              transparent
+              opacity={finalOpacity}
+            />
+          </mesh>
+        )
+      })}
 
       {/* Hit zone - 3D glowing bar with volume - width matches road (12) and scales with group */}
       {/* Position at ground level (Y = -0.5) to attach to road surface */}

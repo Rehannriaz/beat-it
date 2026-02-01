@@ -61,6 +61,25 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
   // Apply scale to lane position
   const laneX = (-4.5 + tile.lane * 3) * scale
 
+  // Calculate fade-in opacity based on Z position (tiles spawn at z = -70)
+  const getSpawnFadeOpacity = (z: number): number => {
+    const spawnZ = -70  // Spawn point
+    const fadeEndZ = -60  // Fully visible here
+    
+    if (z >= fadeEndZ) return 1.0  // Full opacity after fade-in
+    if (z <= spawnZ) return 0.0     // Fully transparent at spawn
+    
+    // Smooth fade-in from spawn to fadeEndZ
+    const fadeRange = fadeEndZ - spawnZ
+    const distanceFromSpawn = z - spawnZ
+    const fadeProgress = distanceFromSpawn / fadeRange
+    // Use smoothstep for smooth fade-in
+    const smoothFade = fadeProgress * fadeProgress * (3 - 2 * fadeProgress)
+    return Math.max(0, Math.min(1, smoothFade))
+  }
+
+  const spawnOpacity = getSpawnFadeOpacity(tile.z)
+
   useEffect(() => {
     if (tile.hit) {
       setHitScale(1.4)
@@ -106,6 +125,8 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
           emissiveIntensity={tile.hit ? 0.5 : 0.2}
           metalness={0.1}
           roughness={0.4}
+          transparent
+          opacity={spawnOpacity}
         />
       </mesh>
 
@@ -122,6 +143,8 @@ export function Tile3DComponent({ tile, theme, onHit }: Tile3DProps) {
           emissiveIntensity={tile.hit ? 0.6 : 0.25}
           metalness={0.05}
           roughness={0.3}
+          transparent
+          opacity={spawnOpacity}
         />
       </mesh>
     </group>
